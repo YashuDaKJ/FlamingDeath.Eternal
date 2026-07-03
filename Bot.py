@@ -54,34 +54,79 @@ RESTRICTIONS:
 
 Remember: You are confident, witty, dramatic about mundane things, but never mean. Be entertaining and proud of Eternal!"""
 
-# Store conversation history for context (optional, per user)
+# Store conversation history for context
 conversation_history = {}
 
 async def get_gemini_response(user_message: str, user_id: int) -> str:
-    """
-    Get a response from Gemini API using conversation history.
-    """
     try:
-        # Initialize conversation history for user if not exists
         if user_id not in conversation_history:
             conversation_history[user_id] = []
         
-        # Add user message to history
         conversation_history[user_id].append({
             "role": "user",
             "parts": [user_message]
         })
         
-        # Create model and send message with system prompt
         model = genai.GenerativeModel(
             model_name="gemini-1.5-flash",
             system_instruction=SYSTEM_PROMPT
         )
         
-        # Send the entire conversation history for context
         response = model.generate_content(conversation_history[user_id])
-        
         assistant_message = response.text
         
-        # Add
-
+        conversation_history[user_id].append({
+            "role": "model",
+            "parts": [assistant_message]
+        })
+        
+        if len(conversation_history[user_id]) > 40:
+            conversation_history[user_id] = conversation_history[user_id][-40:]
+        
+        return assistant_message
+    except Exception as e:
+        print(f"Error: {e}")
+        return f"*ROAARRR!* Something went wrong! {str(e)}"
+
+@bot.event
+async def on_ready():
+    print('Bot is online!')
+    await bot.change_presence(activity=discord.Activity(type=discord.ActivityType.watching, name="over Eternal"))
+
+@bot.command(name='ping')
+async def ping(ctx):
+    latency = round(bot.latency * 1000)
+    await ctx.send(f"*Grrr...* Pong! My flames reached you in {latency}ms!")
+
+@bot.event
+async def on_message(message):
+    if message.author == bot.user:
+        return
+    
+    await bot.process_commands(message)
+    
+    if bot.user.mentioned_in(message) or message.reference:
+        is_reply_to_bot = False
+        if message.reference:
+            try:
+                replied_to = await message.channel.fetch_message(message.reference.message_id)
+                is_reply_to_bot = replied_to.author == bot.user
+            except:
+                pass
+        
+        if bot.user.mentioned_in(message) or is_reply_to_bot:
+            async with message.channel.typing():
+                clean_message = message.content.replace(f'<@{bot.user.id}>', '').replace(f'<@!{bot.user.id}>', '').strip()
+                if clean_message:
+                    response = await get_gemini_response(clean_message, message.author.id)
+                    if len(response) > 2000:
+                        chunks = [response[i:i+1900] for i in range(0, len(response), 1900)]
+                        for chunk in chunks:
+                            await message.reply(chunk, mention_author=False)
+                    else:
+                        await message.reply(response, mention_author=False)
+                else:
+                    await message.reply("*Grrr...* Your message is empty!", mention_author=False)
+
+if __name__ == "__main__":
+    bot.run(DISCORD_TOKEN)
