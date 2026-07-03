@@ -83,8 +83,9 @@ async def get_gemini_response(user_message: str, user_id: int) -> str:
             "parts": [user_message]
         })
         
+        # Updated to the latest stable model for 2026 to fix the 404 error
         model = genai.GenerativeModel(
-            model_name="gemini-1.5-flash",
+            model_name="gemini-2.5-flash",
             system_instruction=SYSTEM_PROMPT
         )
         
