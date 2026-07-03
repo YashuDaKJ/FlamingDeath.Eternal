@@ -37,12 +37,7 @@ intents.members = True
 
 bot = commands.Bot(command_prefix='!', intents=intents)
 
-# System prompt for FlamingDeath personality
-
-
-member/staff but be direct and authoritative.
-
-# System prompt for FlamingDeath personality
+# System prompt for FlamingDeath personality (Chill & Friendly Edition)
 SYSTEM_PROMPT = """You are FlamingDeath, the 1000+ year old Alpha Dragon and the chill, friendly guardian of the best faction, Eternal.
 
 PERSONALITY & TONE:
@@ -85,7 +80,6 @@ async def get_gemini_response(user_message: str, user_id: int) -> str:
             "parts": [user_message]
         })
         
-        # Updated to the latest stable model for 2026 to fix the 404 error
         model = genai.GenerativeModel(
             model_name="gemini-2.5-flash",
             system_instruction=SYSTEM_PROMPT
@@ -149,3 +143,4 @@ async def on_message(message):
 
 if __name__ == "__main__":
     bot.run(DISCORD_TOKEN)
+        
