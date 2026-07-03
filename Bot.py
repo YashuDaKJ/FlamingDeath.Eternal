@@ -3,6 +3,8 @@ import discord
 from discord.ext import commands
 import google.generativeai as genai
 from typing import Optional
+from threading import Thread
+from flask import Flask
 
 # Load API keys from environment variables
 DISCORD_TOKEN = os.getenv('DISCORD_TOKEN')
@@ -10,6 +12,20 @@ GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
 
 if not DISCORD_TOKEN or not GEMINI_API_KEY:
     raise ValueError("DISCORD_TOKEN and GEMINI_API_KEY environment variables must be set!")
+
+# Fake web server to satisfy Render's port requirement
+app = Flask('')
+
+@app.route('/')
+def home():
+    return "FlamingDeath is alive!"
+
+def run_web_server():
+    port = int(os.getenv("PORT", 8080))
+    app.run(host='0.0.0.0', port=port)
+
+# Start the web server in a separate thread
+Thread(target=run_web_server).start()
 
 # Configure Gemini API
 genai.configure(api_key=GEMINI_API_KEY)
