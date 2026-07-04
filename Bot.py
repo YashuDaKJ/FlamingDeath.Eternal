@@ -2,35 +2,36 @@ import os
 import discord
 from discord.ext import commands
 import google.generativeai as genai
-from typing import Optional
 from threading import Thread
 from flask import Flask
 
-# Load API keys from environment variables
+# 1. SETUP FLASK SERVER FIRST FOR RENDER
+app = Flask('')
+
+@app.route('/')
+def home():
+    return "FlamingDeath is perfectly alive and burning!"
+
+def run_web_server():
+    # Render requires port 10000 or the one given in environment
+    port = int(os.getenv("PORT", 10000))
+    app.run(host='0.0.0.0', port=port)
+
+# Start web server immediately in background
+web_thread = Thread(target=run_web_server, daemon=True)
+web_thread.start()
+
+# 2. LOAD ENVIRONMENT VARIABLES
 DISCORD_TOKEN = os.getenv('DISCORD_TOKEN')
 GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
 
 if not DISCORD_TOKEN or not GEMINI_API_KEY:
     raise ValueError("DISCORD_TOKEN and GEMINI_API_KEY environment variables must be set!")
 
-# Fake web server to satisfy Render's port requirement
-app = Flask('')
-
-@app.route('/')
-def home():
-    return "FlamingDeath is alive!"
-
-def run_web_server():
-    port = int(os.getenv("PORT", 8080))
-    app.run(host='0.0.0.0', port=port)
-
-# Start the web server in a separate thread
-Thread(target=run_web_server).start()
-
-# Configure Gemini API
+# 3. CONFIGURE GEMINI
 genai.configure(api_key=GEMINI_API_KEY)
 
-# Initialize bot with intents
+# 4. INITIALIZE DISCORD BOT
 intents = discord.Intents.default()
 intents.message_content = True
 intents.members = True
@@ -67,7 +68,6 @@ RESTRICTIONS:
 
 Remember: You are a proud, cool, and super friendly dragon guardian. Keep it simple, short, fun, and protective of Eternal!"""
 
-# Store conversation history for context
 conversation_history = {}
 
 async def get_gemini_response(user_message: str, user_id: int) -> str:
@@ -143,4 +143,3 @@ async def on_message(message):
 
 if __name__ == "__main__":
     bot.run(DISCORD_TOKEN)
-        
