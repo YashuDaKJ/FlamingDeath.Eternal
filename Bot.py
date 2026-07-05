@@ -74,7 +74,7 @@ RESTRICTIONS:
 - Answer directly without spinning long stories."""
 
 conversation_history = {}
-dragon_currency = {}  # Hunt game ke data ke liye simple storage
+dragon_currency = {}  # Hunt aur mini-games ke data ke liye economy system
 
 async def get_gemini_response(user_message: str, user_id: int, attachment_data=None) -> str:
     try:
@@ -119,13 +119,13 @@ async def on_ready():
     print(f'{bot.user.name} is online and fully synced!')
     await bot.change_presence(activity=discord.Activity(type=discord.ActivityType.watching, name="over Eternal"))
     try:
-        # Slash commands ko Discord servers ke sath sync karne ke liye
+        # Slash commands ko sync karne ke liye
         synced = await bot.tree.sync()
         print(f"Successfully synced {len(synced)} slash commands.")
     except Exception as e:
         print(f"Slash sync error: {e}")
 
-# Traditional !ping command (as it was)
+# Traditional !ping command
 @bot.command(name='ping')
 async def ping(ctx):
     latency = round(bot.latency * 1000)
@@ -136,8 +136,8 @@ class HelpDropdown(discord.ui.Select):
     def __init__(self):
         options = [
             discord.SelectOption(label="General Commands", description="Basic chat and utility features", emoji="🐉"),
-            discord.SelectOption(label="AI Multimedia", description="Image creation and vision features", emoji="🎨"),
-            discord.SelectOption(label="Faction & RPG", description="Check levels and hunt items", emoji="⚔️")
+            discord.SelectOption(label="AI Multimedia", description="Vision features", emoji="🎨"),
+            discord.SelectOption(label="Faction Games & RPG", description="Play games and earn crystals", emoji="⚔️")
         ]
         super().__init__(placeholder="Choose a category...", min_values=1, max_values=1, options=options)
 
@@ -148,14 +148,15 @@ class HelpDropdown(discord.ui.Select):
             embed.add_field(name="💬 Chat Mode", value=f"Talk to me directly in <#{SPECIAL_CHANNEL_ID}> without pings, or mention/reply to me in any other channel!", inline=False)
             await interaction.response.edit_message(embed=embed)
         elif self.values[0] == "AI Multimedia":
-            embed = discord.Embed(title="🎨 AI & Multimedia Commands", color=discord.Color.cyan())
+            embed = discord.Embed(title="🎨 AI Multimedia Commands", color=discord.Color.cyan())
             embed.add_field(name="`/analyze`", value="Upload an image, video, or audio file, and I will check it with my Dragon Vision!", inline=False)
-            embed.add_field(name="`/spawn-image`", value="Generate a cool graphic in the official ETERNAL color style.", inline=False)
             await interaction.response.edit_message(embed=embed)
-        elif self.values[0] == "Faction & RPG":
-            embed = discord.Embed(title="⚔️ Faction & RPG System", color=discord.Color.dark_red())
-            embed.add_field(name="`/profile`", value="View your ETERNAL member profile card.", inline=False)
-            embed.add_field(name="`/hunt`", value="Go out on a hunt to earn Dragon Crystals (once every hour).", inline=False)
+        elif self.values[0] == "Faction Games & RPG":
+            embed = discord.Embed(title="⚔️ Faction Games & Economy System", color=discord.Color.dark_red())
+            embed.add_field(name="`/profile`", value="View your ETERNAL member card and Crystal balance.", inline=False)
+            embed.add_field(name="`/hunt`", value="Go out on a hunt to earn Dragon Crystals (1 hour cooldown).", inline=False)
+            embed.add_field(name="`/coinflip`", value="Bet your crystals on Heads or Tails to double them!", inline=False)
+            embed.add_field(name="`/slots`", value="Try your luck on the Dragon Slot Machine (Cost: 10 Crystals).", inline=False)
             await interaction.response.edit_message(embed=embed)
 
 class HelpView(discord.ui.View):
@@ -184,7 +185,6 @@ async def analyze(interaction: discord.Interaction, prompt: str, attachment: dis
         return
 
     try:
-        # Download attachment bytes via requests for safety
         file_response = requests.get(attachment.url)
         attachment_data = {
             'mime_type': attachment.content_type,
@@ -196,41 +196,7 @@ async def analyze(interaction: discord.Interaction, prompt: str, attachment: dis
     except Exception as e:
         await interaction.followup.send(f"🔥 *Coughs smoke* Failed to look at the file! Error: {str(e)}")
 
-# --- 3. IMAGEN / GEMINI GENERATOR (`/spawn-image`) ---
-@bot.tree.command(name="spawn-image", description="Create an AI image matching Eternal's style")
-@app_commands.describe(prompt="What do you want to create?")
-async def spawn_image(interaction: discord.Interaction, prompt: str):
-    await interaction.response.defer()
-    try:
-        # Faction color injection prompt
-        styled_prompt = (
-            f"Generate an image based on this description: {prompt}. "
-            "Art style must be a high-quality cinematic digital painting. "
-            "The color palette must strictly use glowing sky-blue, electric cyan accents, and crisp white details."
-        )
-        
-        # Fixed Model call to use built-in generation support format
-        model = genai.GenerativeModel(model_name="gemini-2.5-flash-image")
-        response = model.generate_content(styled_prompt)
-        
-        # Safely extract image bytes from the response parts
-        image_bytes = None
-        for part in response.candidates[0].content.parts:
-            if part.inline_data:
-                image_bytes = part.inline_data.data
-                break
-                
-        if not image_bytes:
-            await interaction.followup.send("🔥 My flames burned too hot! No image data was found in the response.")
-            return
-
-        discord_file = discord.File(io.BytesIO(image_bytes), filename="eternal_spawn.png")
-        await interaction.followup.send(content=f"🐉 *ROAARRR!* Spawning your creation, {interaction.user.mention}!", file=discord_file)
-    except Exception as e:
-        print(f"Spawn image error: {e}")
-        await interaction.followup.send(f"🔥 Couldn't spawn the image! Error: {str(e)}")
-
-# --- 4. FACTION PROFILE CARD (`/profile`) ---
+# --- 3. FACTION PROFILE CARD (`/profile`) ---
 @bot.tree.command(name="profile", description="Check your ETERNAL faction member card")
 async def profile(interaction: discord.Interaction):
     user = interaction.user
@@ -240,14 +206,13 @@ async def profile(interaction: discord.Interaction):
     embed = discord.Embed(title=f"⚔️ ETERNAL Member Profile: {user.name}", color=discord.Color.blue())
     embed.set_thumbnail(url=user.display_avatar.url)
     embed.add_field(name="Faction Standing", value="**Loyal Member** 🛡️", inline=True)
-    embed.add_field(name="Dragon Crystals", value=f"✨ `{crystals}`", inline=True)
+    embed.add_field(name="Dragon Crystals", value=f"✨ `{crystals}` Crystals", inline=True)
     embed.add_field(name="Arrival Date", value=f"📅 {joined_at}", inline=False)
     embed.set_footer(text="FlamingDeath is watching over your journey.")
     
     await interaction.response.send_message(embed=embed)
 
-# --- 5. DRAGON MINI-GAME HUNT (`/hunt`) ---
-# Cooldown tracking variable
+# --- 4. DRAGON MINI-GAME HUNT (`/hunt`) ---
 hunt_cooldowns = {}
 
 @bot.tree.command(name="hunt", description="Go out on a dynamic dragon hunt to collect crystals!")
@@ -255,7 +220,6 @@ async def hunt(interaction: discord.Interaction):
     user_id = interaction.user.id
     now = datetime.now()
     
-    # 1 hour cooldown logic
     if user_id in hunt_cooldowns:
         diff = now - hunt_cooldowns[user_id]
         if diff.total_seconds() < 3600:
@@ -263,7 +227,6 @@ async def hunt(interaction: discord.Interaction):
             await interaction.response.send_message(f"🔥 *Growls...* You are exhausted! Wait `{remaining_mins} more minutes` before hunting again.", ephemeral=True)
             return
 
-    # Execute hunt
     hunt_cooldowns[user_id] = now
     crystals_found = random.randint(15, 50)
     dragon_currency[user_id] = dragon_currency.get(user_id, 0) + crystals_found
@@ -273,19 +236,84 @@ async def hunt(interaction: discord.Interaction):
         f"⚔️ You cleared out rogue monsters threatening the boundaries of Eternal. Earned **{crystals_found}** Crystals!",
         f"💎 You discovered a hidden crystalline cave beneath the SquareOne base! Extracted **{crystals_found}** Crystals!"
     ]
-    
     await interaction.response.send_message(random.choice(scenarios))
 
-# --- 6. ADVANCED ROUTING ON MESSAGE HANDLER ---
+# --- 5. NEW GAME: COINFLIP (`/coinflip`) ---
+@bot.tree.command(name="coinflip", description="Bet your crystals on a coin toss!")
+@app_commands.describe(choice="Choose Heads or Tails", bet="Amount of crystals to bet")
+@app_commands.choices(choice=[
+    app_commands.Choice(name="Heads", value="heads"),
+    app_commands.Choice(name="Tails", value="tails")
+])
+async def coinflip(interaction: discord.Interaction, choice: app_commands.Choice[str], bet: int):
+    user_id = interaction.user.id
+    current_balance = dragon_currency.get(user_id, 0)
+    
+    if bet <= 0:
+        await interaction.response.send_message("🔥 *Grrr...* Shart lagane ke liye kam se kam `1 Crystal` hona chahiye!", ephemeral=True)
+        return
+        
+    if current_balance < bet:
+        await interaction.response.send_message(f"🔥 *Growls...* Tumhare paas sirf `{current_balance}` Crystals hain, tum `{bet}` ki shart nahi laga sakte! Pehle `/hunt` karo.", ephemeral=True)
+        return
+        
+    # Flip the coin
+    result = random.choice(["heads", "tails"])
+    
+    if choice.value == result:
+        dragon_currency[user_id] = current_balance + bet
+        await interaction.response.send_message(f"🪙 **Coinflip:** Sikka ghuma... aur **{result.upper()}** aaya! 🎉 Tum jeet gaye! Tumhe **{bet}** Crystals mile! Total: `{dragon_currency[user_id]}`")
+    else:
+        dragon_currency[user_id] = current_balance - bet
+        await interaction.response.send_message(f"🪙 **Coinflip:** Sikka ghuma... aur **{result.upper()}** aaya. 💀 Oh no! Tum shart haar gaye aur **{bet}** Crystals kho diye. Total: `{dragon_currency[user_id]}`")
+
+# --- 6. NEW GAME: SLOTS (`/slots`) ---
+@bot.tree.command(name="slots", description="Play the Dragon Slot Machine! (Cost: 10 Crystals)")
+async def slots(interaction: discord.Interaction):
+    user_id = interaction.user.id
+    current_balance = dragon_currency.get(user_id, 0)
+    cost = 10
+    
+    if current_balance < cost:
+        await interaction.response.send_message(f"🔥 *Coughs smoke...* Slot machine chalane ke liye `{cost} Crystals` chahiye! Tumhare paas sirf `{current_balance}` hain.", ephemeral=True)
+        return
+        
+    # Deduct cost
+    dragon_currency[user_id] = current_balance - cost
+    
+    items = ["🐉", "💎", "⚔️", "🔥", "🍉"]
+    slot1 = random.choice(items)
+    slot2 = random.choice(items)
+    slot3 = random.choice(items)
+    
+    embed = discord.Embed(title="🎰 ETERNAL DRAGON SLOTS 🎰", color=discord.Color.gold())
+    embed.description = f"\n> **[ {slot1} | {slot2} | {slot3} ]**\n"
+    
+    # Win Conditions
+    if slot1 == slot2 == slot3:
+        # Jackpot!
+        reward = 150
+        dragon_currency[user_id] += reward
+        embed.add_field(name="🎉 JACKPOT!!! 🎉", value=f"Saare items match ho gaye! FlamingDeath ne khush hokar tumhe **{reward}** Crystals diye! 🔥 Total: `{dragon_currency[user_id]}`")
+    elif slot1 == slot2 or slot2 == slot3 or slot1 == slot3:
+        # Two Match
+        reward = 30
+        dragon_currency[user_id] += reward
+        embed.add_field(name="✨ Small Win! ✨", value=f"Do items match ho gaye! Tumne **{reward}** Crystals jeete! Total: `{dragon_currency[user_id]}`")
+    else:
+        # Loss
+        embed.add_field(name="💀 No Match!", value=f"Ek bhi item match nahi hua! Tumne 10 Crystals kho diye. Total: `{dragon_currency[user_id]}`")
+        
+    await interaction.response.send_message(embed=embed)
+
+# --- 7. ADVANCED ROUTING ON MESSAGE HANDLER ---
 @bot.event
 async def on_message(message):
     if message.author == bot.user:
         return
     
-    # Process prefix commands like !ping first
     await bot.process_commands(message)
     
-    # Check karein ki user ne bot ko ping kiya hai ya reply kiya hai
     is_pinged_or_replied = bot.user.mentioned_in(message)
     if not is_pinged_or_replied and message.reference:
         try:
@@ -295,25 +323,17 @@ async def on_message(message):
         except:
             pass
 
-    # Check karein ki kya user ne bot ka naam message text me liya hai (Case-insensitive)
     name_called = "flamingdeath" in message.content.lower()
-
-    # CRITICAL LOGIC ROUTING:
-    # Condition A: Yeh hamara special channel ID hai (bina ping ya name ke reply karega)
-    # Condition B: Kisi aur channel me name liya ho, ping kiya ho, ya reply kiya ho
     should_reply = (message.channel.id == SPECIAL_CHANNEL_ID) or is_pinged_or_replied or name_called
 
     if should_reply:
         async with message.channel.typing():
-            # Formatting clean prompt text
             clean_message = message.content.replace(f'<@{bot.user.id}>', '').replace(f'<@!{bot.user.id}>', '').strip()
             
-            # Agar sirf image/file aayi hai text ke bina special channel me, default prompt de do
             if not clean_message and message.attachments:
                 clean_message = "Look at this file!"
             
             if clean_message:
-                # Agar koi direct message me attachment ho bina slash command ke use kiya ho
                 attachment_data = None
                 if message.attachments:
                     try:
@@ -327,10 +347,8 @@ async def on_message(message):
                     except Exception as img_err:
                         print(f"Direct text attachment read error: {img_err}")
                 
-                # Fetch output from Gemini
                 response = await get_gemini_response(clean_message, message.author.id, attachment_data)
                 
-                # Handling message lengths gracefully
                 if len(response) > 2000:
                     chunks = [response[i:i+1900] for i in range(0, len(response), 1900)]
                     for chunk in chunks:
@@ -338,7 +356,6 @@ async def on_message(message):
                 else:
                     await message.reply(response, mention_author=False)
             else:
-                # Agar message sach me empty ho bina files ke
                 if not message.attachments:
                     await message.reply("*Grrr...* Your message is empty!", mention_author=False)
 
