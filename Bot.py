@@ -250,11 +250,11 @@ async def coinflip(interaction: discord.Interaction, choice: app_commands.Choice
     current_balance = dragon_currency.get(user_id, 0)
     
     if bet <= 0:
-        await interaction.response.send_message("🔥 *Grrr...* Shart lagane ke liye kam se kam `1 Crystal` hona chahiye!", ephemeral=True)
+        await interaction.response.send_message("🔥 *Grrr...* You must bet at least `1 Crystal`!", ephemeral=True)
         return
         
     if current_balance < bet:
-        await interaction.response.send_message(f"🔥 *Growls...* Tumhare paas sirf `{current_balance}` Crystals hain, tum `{bet}` ki shart nahi laga sakte! Pehle `/hunt` karo.", ephemeral=True)
+        await interaction.response.send_message(f"🔥 *Growls...* You only have `{current_balance}` Crystals! You can't bet `{bet}`. Go `/hunt` first!", ephemeral=True)
         return
         
     # Flip the coin
@@ -262,10 +262,10 @@ async def coinflip(interaction: discord.Interaction, choice: app_commands.Choice
     
     if choice.value == result:
         dragon_currency[user_id] = current_balance + bet
-        await interaction.response.send_message(f"🪙 **Coinflip:** Sikka ghuma... aur **{result.upper()}** aaya! 🎉 Tum jeet gaye! Tumhe **{bet}** Crystals mile! Total: `{dragon_currency[user_id]}`")
+        await interaction.response.send_message(f"🪙 **Coinflip:** The coin spins... and it's **{result.upper()}**! 🎉 You win! You gained **{bet}** Crystals! Total: `{dragon_currency[user_id]}`")
     else:
         dragon_currency[user_id] = current_balance - bet
-        await interaction.response.send_message(f"🪙 **Coinflip:** Sikka ghuma... aur **{result.upper()}** aaya. 💀 Oh no! Tum shart haar gaye aur **{bet}** Crystals kho diye. Total: `{dragon_currency[user_id]}`")
+        await interaction.response.send_message(f"🪙 **Coinflip:** The coin spins... and it's **{result.upper()}**. 💀 Oh no! You lost the bet and lost **{bet}** Crystals. Total: `{dragon_currency[user_id]}`")
 
 # --- 6. NEW GAME: SLOTS (`/slots`) ---
 @bot.tree.command(name="slots", description="Play the Dragon Slot Machine! (Cost: 10 Crystals)")
@@ -275,7 +275,7 @@ async def slots(interaction: discord.Interaction):
     cost = 10
     
     if current_balance < cost:
-        await interaction.response.send_message(f"🔥 *Coughs smoke...* Slot machine chalane ke liye `{cost} Crystals` chahiye! Tumhare paas sirf `{current_balance}` hain.", ephemeral=True)
+        await interaction.response.send_message(f"🔥 *Coughs smoke...* It costs `{cost} Crystals` to spin the slot machine! You only have `{current_balance}`.", ephemeral=True)
         return
         
     # Deduct cost
@@ -294,15 +294,15 @@ async def slots(interaction: discord.Interaction):
         # Jackpot!
         reward = 150
         dragon_currency[user_id] += reward
-        embed.add_field(name="🎉 JACKPOT!!! 🎉", value=f"Saare items match ho gaye! FlamingDeath ne khush hokar tumhe **{reward}** Crystals diye! 🔥 Total: `{dragon_currency[user_id]}`")
+        embed.add_field(name="🎉 JACKPOT!!! 🎉", value=f"All items matched! FlamingDeath happily rewarded you with **{reward}** Crystals! 🔥 Total: `{dragon_currency[user_id]}`")
     elif slot1 == slot2 or slot2 == slot3 or slot1 == slot3:
         # Two Match
         reward = 30
         dragon_currency[user_id] += reward
-        embed.add_field(name="✨ Small Win! ✨", value=f"Do items match ho gaye! Tumne **{reward}** Crystals jeete! Total: `{dragon_currency[user_id]}`")
+        embed.add_field(name="✨ Small Win! ✨", value=f"Two items matched! You won **{reward}** Crystals! Total: `{dragon_currency[user_id]}`")
     else:
         # Loss
-        embed.add_field(name="💀 No Match!", value=f"Ek bhi item match nahi hua! Tumne 10 Crystals kho diye. Total: `{dragon_currency[user_id]}`")
+        embed.add_field(name="💀 No Match!", value=f"No items matched! You lost 10 Crystals. Total: `{dragon_currency[user_id]}`")
         
     await interaction.response.send_message(embed=embed)
 
