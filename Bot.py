@@ -196,30 +196,38 @@ async def analyze(interaction: discord.Interaction, prompt: str, attachment: dis
     except Exception as e:
         await interaction.followup.send(f"🔥 *Coughs smoke* Failed to look at the file! Error: {str(e)}")
 
-# --- 3. IMAGEN GENERATOR (`/spawn-image`) ---
+# --- 3. IMAGEN / GEMINI GENERATOR (`/spawn-image`) ---
 @bot.tree.command(name="spawn-image", description="Create an AI image matching Eternal's style")
 @app_commands.describe(prompt="What do you want to create?")
 async def spawn_image(interaction: discord.Interaction, prompt: str):
     await interaction.response.defer()
     try:
         # Faction color injection prompt
-        styled_prompt = f"Cinematic digital painting art style, themed around: {prompt}. Base aesthetic uses glowing sky-blue, electric cyan accents, and crisp white details."
-        
-        # Correctly call the imagen-3 model endpoint via standard generativeai library
-        image_response = genai.generate_images(
-            prompt=styled_prompt,
-            model_name="imagen-3"
+        styled_prompt = (
+            f"Generate an image based on this description: {prompt}. "
+            "Art style must be a high-quality cinematic digital painting. "
+            "The color palette must strictly use glowing sky-blue, electric cyan accents, and crisp white details."
         )
         
-        if not image_response.images:
-            await interaction.followup.send("🔥 My flames burned too hot! No image was generated.")
+        # Fixed Model call to use built-in generation support format
+        model = genai.GenerativeModel(model_name="gemini-2.5-flash-image")
+        response = model.generate_content(styled_prompt)
+        
+        # Safely extract image bytes from the response parts
+        image_bytes = None
+        for part in response.candidates[0].content.parts:
+            if part.inline_data:
+                image_bytes = part.inline_data.data
+                break
+                
+        if not image_bytes:
+            await interaction.followup.send("🔥 My flames burned too hot! No image data was found in the response.")
             return
 
-        image_bytes = image_response.images[0].content
         discord_file = discord.File(io.BytesIO(image_bytes), filename="eternal_spawn.png")
-        
         await interaction.followup.send(content=f"🐉 *ROAARRR!* Spawning your creation, {interaction.user.mention}!", file=discord_file)
     except Exception as e:
+        print(f"Spawn image error: {e}")
         await interaction.followup.send(f"🔥 Couldn't spawn the image! Error: {str(e)}")
 
 # --- 4. FACTION PROFILE CARD (`/profile`) ---
