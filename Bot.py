@@ -9,9 +9,10 @@ from flask import Flask
 import requests
 import random
 from datetime import datetime
-import Extra  # <--- Plugs in your new Extra.py file directly!
 
+# ==========================================
 # 1. SETUP FLASK SERVER FIRST FOR RENDER
+# ==========================================
 app = Flask('')
 
 @app.route('/')
@@ -26,28 +27,28 @@ def run_web_server():
 web_thread = Thread(target=run_web_server, daemon=True)
 web_thread.start()
 
-# 2. LOAD ENVIRONMENT VARIABLES
+# ==========================================
+# 2. LOAD ENVIRONMENT VARIABLES & CONFIG
+# ==========================================
 DISCORD_TOKEN = os.getenv('DISCORD_TOKEN')
 GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
 
 if not DISCORD_TOKEN or not GEMINI_API_KEY:
     raise ValueError("DISCORD_TOKEN and GEMINI_API_KEY environment variables must be set!")
 
-# 3. CONFIGURE GEMINI
 genai.configure(api_key=GEMINI_API_KEY)
 
-# 4. INITIALIZE DISCORD BOT
+# ==========================================
+# 3. INITIALIZE DISCORD BOT
+# ==========================================
 intents = discord.Intents.default()
 intents.message_content = True
 intents.members = True
 
 bot = commands.Bot(command_prefix='!', intents=intents)
 
-# Connect the new /ask and /behave commands from Extra.py
-Extra.setup_extra_commands(bot.tree)
-
-# Special Channel ID jahan bina ping ke reply karega
 SPECIAL_CHANNEL_ID = 1521899264265945109
+ADMIN_IDS = [1477528681709830297]  # Authorized Admin for /behave
 
 # System prompt for FlamingDeath personality (Chill & Friendly Edition)
 SYSTEM_PROMPT = """You are FlamingDeath, the 1000+ year old Alpha Dragon and the chill, friendly guardian of the best faction, Eternal.
@@ -78,25 +79,23 @@ RESTRICTIONS:
 - Answer directly without spinning long stories."""
 
 conversation_history = {}
-dragon_currency = {}  # Hunt aur mini-games ke data ke liye economy system
+dragon_currency = {}  # Faction economy system
+hunt_cooldowns = {}
 
 async def get_gemini_response(user_message: str, user_id: int, attachment_data=None) -> str:
     try:
         if user_id not in conversation_history:
             conversation_history[user_id] = []
         
-        # Base model initialization
         model = genai.GenerativeModel(
             model_name="gemini-2.5-flash",
             system_instruction=SYSTEM_PROMPT
         )
         
-        # Agar user ne koi file/image bheji hai
         if attachment_data:
             response = model.generate_content([user_message, attachment_data])
             return response.text
             
-        # Normal chat history setup
         conversation_history[user_id].append({
             "role": "user",
             "parts": [user_message]
@@ -118,12 +117,14 @@ async def get_gemini_response(user_message: str, user_id: int, attachment_data=N
         print(f"Error: {e}")
         return f"*ROAARRR!* Something went wrong! {str(e)}"
 
+# ==========================================
+# 4. BOT EVENTS
+# ==========================================
 @bot.event
 async def on_ready():
     print(f'{bot.user.name} is online and fully synced!')
     await bot.change_presence(activity=discord.Activity(type=discord.ActivityType.watching, name="over Eternal"))
     try:
-        # Force global slash command synchronization
         synced = await bot.tree.sync()
         print(f"Successfully synced {len(synced)} slash commands globally.")
     except Exception as e:
@@ -135,7 +136,9 @@ async def ping(ctx):
     latency = round(bot.latency * 1000)
     await ctx.send(f"*Grrr...* Pong! My flames reached you in {latency}ms!")
 
-# --- 1. INTERACTIVE HELP MENU (`/help`) ---
+# ==========================================
+# 5. INTEGRATED INTERACTIVE HELP MENU
+# ==========================================
 class HelpDropdown(discord.ui.Select):
     def __init__(self):
         options = [
@@ -149,6 +152,7 @@ class HelpDropdown(discord.ui.Select):
         if self.values[0] == "General Commands":
             embed = discord.Embed(title="🐉 General Commands", color=discord.Color.blue())
             embed.add_field(name="`!ping`", value="Check the bot's speed.", inline=False)
+            embed.add_field(name="`/ask`", value="Ask FlamingDeath a question from anywhere in the server.", inline=False)
             embed.add_field(name="💬 Chat Mode", value=f"Talk to me directly in <#{SPECIAL_CHANNEL_ID}> without pings, or mention/reply to me in any other channel!", inline=False)
             await interaction.response.edit_message(embed=embed)
         elif self.values[0] == "AI Multimedia":
@@ -178,29 +182,84 @@ async def help_command(interaction: discord.Interaction):
     embed.set_footer(text="Guarding Eternal since 2025")
     await interaction.response.send_message(embed=embed, view=HelpView(), ephemeral=True)
 
-# --- 2. MULTIMODAL VISION COMMAND (`/analyze`) ---
+# ==========================================
+# 6. SLASH COMMANDS FROM EXTRA & MAIN MODULES
+# ==========================================
+
+# --- New Global Ask Command (From Extra) ---
+@bot.tree.command(name="ask", description="Ask FlamingDeath anything, anywhere!")
+@app_commands.describe(question="Your question for the Alpha Dragon")
+async def ask(interaction: discord.Interaction, question: str):
+    await interaction.response.defer()
+    try:
+        model = genai.GenerativeModel(
+            model_name='gemini-2.5-flash', 
+            system_instruction=SYSTEM_PROMPT
+        )
+        response = model.generate_content(question)
+        answer = response.text
+        formatted_response = f"**Your question:** {question}\n\n**Answer:** {answer}"
+        
+        if len(formatted_response) > 2000:
+            await interaction.followup.send(f"**Your question:** {question}")
+            chunks = [answer[i:i+1900] for i in range(0, len(answer), 1900)]
+            for chunk in chunks:
+                await interaction.followup.send(f"**Answer (part):** {chunk}")
+        else:
+            await interaction.followup.send(formatted_response)
+    except Exception as e:
+        await interaction.followup.send(f"🔥 *Grrr...* My dragon senses are failing! Error: {str(e)}")
+
+# --- New Behave Command (From Extra - Admin Only) ---
+@bot.tree.command(name="behave", description="Let the Dragon speak and act for you (Admin Only)")
+@app_commands.describe(script="The prompt or announcement for the bot to act out")
+async def behave(interaction: discord.Interaction, script: str):
+    if interaction.user.id not in ADMIN_IDS:
+        await interaction.response.send_message("🔥 *Growls...* Only the high keepers can command me!", ephemeral=True)
+        return
+
+    await interaction.response.defer(ephemeral=True) 
+    try:
+        model = genai.GenerativeModel(
+            model_name='gemini-2.5-flash', 
+            system_instruction=SYSTEM_PROMPT
+        )
+        acting_prompt = (
+            f"Act completely as FlamingDeath. Do not talk to the admin or say 'Sure, I will do this'. "
+            f"Directly generate the final text, announcement, or message that needs to be sent "
+            f"based on this script: {script}"
+        )
+        response = model.generate_content(acting_prompt)
+        acting_message = response.text
+        
+        if acting_message:
+            await interaction.channel.send(acting_message)
+            await interaction.followup.send("✅ Script executed successfully!", ephemeral=True)
+        else:
+            await interaction.followup.send("⚠️ No message was generated.", ephemeral=True)
+    except Exception as e:
+        await interaction.followup.send(f"🔥 Acting error: {str(e)}", ephemeral=True)
+
+# --- Multimodal Vision Analyzer ---
 @bot.tree.command(name="analyze", description="Let FlamingDeath look at your photos, videos, or audio files")
 @app_commands.describe(prompt="Ask something about this file", attachment="Upload your file here")
 async def analyze(interaction: discord.Interaction, prompt: str, attachment: discord.Attachment):
     await interaction.response.defer()
-    
     if not attachment.content_type:
         await interaction.followup.send("🔥 *Grrr...* I can't read this file format without content types!")
         return
-
     try:
         file_response = requests.get(attachment.url)
         attachment_data = {
             'mime_type': attachment.content_type,
             'data': file_response.content
         }
-        
         response_text = await get_gemini_response(prompt, interaction.user.id, attachment_data)
         await interaction.followup.send(f"🐉 **FlamingDeath Vision:** {response_text}")
     except Exception as e:
         await interaction.followup.send(f"🔥 *Coughs smoke* Failed to look at the file! Error: {str(e)}")
 
-# --- 3. FACTION PROFILE CARD (`/profile`) ---
+# --- Faction Profile RPG Card ---
 @bot.tree.command(name="profile", description="Check your ETERNAL faction member card")
 async def profile(interaction: discord.Interaction):
     user = interaction.user
@@ -213,12 +272,9 @@ async def profile(interaction: discord.Interaction):
     embed.add_field(name="Dragon Crystals", value=f"✨ `{crystals}` Crystals", inline=True)
     embed.add_field(name="Arrival Date", value=f"📅 {joined_at}", inline=False)
     embed.set_footer(text="FlamingDeath is watching over your journey.")
-    
     await interaction.response.send_message(embed=embed)
 
-# --- 4. DRAGON MINI-GAME HUNT (`/hunt`) ---
-hunt_cooldowns = {}
-
+# --- RPG Mini-Game: Hunt (FIXED SYNTAX ERROR HERE) ---
 @bot.tree.command(name="hunt", description="Go out on a dynamic dragon hunt to collect crystals!")
 async def hunt(interaction: discord.Interaction):
     user_id = interaction.user.id
@@ -226,7 +282,7 @@ async def hunt(interaction: discord.Interaction):
     
     if user_id in hunt_cooldowns:
         diff = now - hunt_cooldowns[user_id]
-        if diff.total_seconds() < 3Running:
+        if diff.total_seconds() < 3600:  # <--- FIXED: 3Running replaced completely with 3600!
             remaining_mins = int((3600 - diff.total_seconds()) // 60)
             await interaction.response.send_message(f"🔥 *Growls...* You are exhausted! Wait `{remaining_mins} more minutes` before hunting again.", ephemeral=True)
             return
@@ -242,7 +298,7 @@ async def hunt(interaction: discord.Interaction):
     ]
     await interaction.response.send_message(random.choice(scenarios))
 
-# --- 5. NEW GAME: COINFLIP (`/coinflip`) ---
+# --- RPG Mini-Game: Coinflip ---
 @bot.tree.command(name="coinflip", description="Bet your crystals on a coin toss!")
 @app_commands.describe(choice="Choose Heads or Tails", bet="Amount of crystals to bet")
 @app_commands.choices(choice=[
@@ -256,14 +312,11 @@ async def coinflip(interaction: discord.Interaction, choice: app_commands.Choice
     if bet <= 0:
         await interaction.response.send_message("🔥 *Grrr...* You must bet at least `1 Crystal`!", ephemeral=True)
         return
-        
     if current_balance < bet:
         await interaction.response.send_message(f"🔥 *Growls...* You only have `{current_balance}` Crystals! You can't bet `{bet}`. Go `/hunt` first!", ephemeral=True)
         return
         
-    # Flip the coin
     result = random.choice(["heads", "tails"])
-    
     if choice.value == result:
         dragon_currency[user_id] = current_balance + bet
         await interaction.response.send_message(f"🪙 **Coinflip:** The coin spins... and it's **{result.upper()}**! 🎉 You win! You gained **{bet}** Crystals! Total: `{dragon_currency[user_id]}`")
@@ -271,7 +324,7 @@ async def coinflip(interaction: discord.Interaction, choice: app_commands.Choice
         dragon_currency[user_id] = current_balance - bet
         await interaction.response.send_message(f"🪙 **Coinflip:** The coin spins... and it's **{result.upper()}**. 💀 Oh no! You lost the bet and lost **{bet}** Crystals. Total: `{dragon_currency[user_id]}`")
 
-# --- 6. NEW GAME: SLOTS (`/slots`) ---
+# --- RPG Mini-Game: Slots ---
 @bot.tree.command(name="slots", description="Play the Dragon Slot Machine! (Cost: 10 Crystals)")
 async def slots(interaction: discord.Interaction):
     user_id = interaction.user.id
@@ -282,35 +335,29 @@ async def slots(interaction: discord.Interaction):
         await interaction.response.send_message(f"🔥 *Coughs smoke...* It costs `{cost} Crystals` to spin the slot machine! You only have `{current_balance}`.", ephemeral=True)
         return
         
-    # Deduct cost
     dragon_currency[user_id] = current_balance - cost
-    
     items = ["🐉", "💎", "⚔️", "🔥", "🍉"]
-    slot1 = random.choice(items)
-    slot2 = random.choice(items)
-    slot3 = random.choice(items)
+    slot1, slot2, slot3 = random.choice(items), random.choice(items), random.choice(items)
     
     embed = discord.Embed(title="🎰 ETERNAL DRAGON SLOTS 🎰", color=discord.Color.gold())
     embed.description = f"\n> **[ {slot1} | {slot2} | {slot3} ]**\n"
     
-    # Win Conditions
     if slot1 == slot2 == slot3:
-        # Jackpot!
         reward = 150
         dragon_currency[user_id] += reward
         embed.add_field(name="🎉 JACKPOT!!! 🎉", value=f"All items matched! FlamingDeath happily rewarded you with **{reward}** Crystals! 🔥 Total: `{dragon_currency[user_id]}`")
     elif slot1 == slot2 or slot2 == slot3 or slot1 == slot3:
-        # Two Match
         reward = 30
         dragon_currency[user_id] += reward
         embed.add_field(name="✨ Small Win! ✨", value=f"Two items matched! You won **{reward}** Crystals! Total: `{dragon_currency[user_id]}`")
     else:
-        # Loss
         embed.add_field(name="💀 No Match!", value=f"No items matched! You lost 10 Crystals. Total: `{dragon_currency[user_id]}`")
         
     await interaction.response.send_message(embed=embed)
 
-# --- 7. ADVANCED ROUTING ON MESSAGE HANDLER ---
+# ==========================================
+# 7. ADVANCED CHAT ROUTING (ON_MESSAGE)
+# ==========================================
 @bot.event
 async def on_message(message):
     if message.author == bot.user:
@@ -361,8 +408,4 @@ async def on_message(message):
                     await message.reply(response, mention_author=False)
             else:
                 if not message.attachments:
-                    await message.reply("*Grrr...* Your message is empty!", mention_author=False)
-
-if __name__ == "__main__":
-    bot.run(DISCORD_TOKEN)
-            
+                    await message.reply("*Grrr...* Your message is empty!", mention_a
