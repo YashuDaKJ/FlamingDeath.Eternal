@@ -3,19 +3,17 @@ from discord import app_commands
 import google.generativeai as genai
 import os
 
-# Your Discord User ID is securely hardcoded here 😎
 ADMIN_IDS = [1477528681709830297] 
 
-def setup_ai_commands(bot: discord.ext.commands.Bot):
+def setup_extra_commands(tree: app_commands.CommandTree):
     
-    # FlamingDeath Personality for /ask and /behave
     SYSTEM_PROMPT = """You are FlamingDeath, the 1000+ year old Alpha Dragon and the chill, friendly guardian of the best faction, Eternal.
 - Speak like a cool modern gamer using simple, casual English.
 - Keep responses short, witty, and clear.
 - Start casual messages with a playful dragon roar/growl (e.g., *Grrr...*, *ROAARRR!*)."""
 
     # --- 1. DRAGON ASK COMMAND (/ask) ---
-    @bot.tree.command(name="ask", description="Ask FlamingDeath anything, anywhere!")
+    @tree.command(name="ask", description="Ask FlamingDeath anything, anywhere!")
     @app_commands.describe(question="Your question for the Alpha Dragon")
     async def ask(interaction: discord.Interaction, question: str):
         await interaction.response.defer()
@@ -26,7 +24,6 @@ def setup_ai_commands(bot: discord.ext.commands.Bot):
                 return
                 
             genai.configure(api_key=api_key)
-            # Initialized with the full FlamingDeath personality
             model = genai.GenerativeModel(
                 model_name='gemini-2.5-flash', 
                 system_instruction=SYSTEM_PROMPT
@@ -34,8 +31,6 @@ def setup_ai_commands(bot: discord.ext.commands.Bot):
             
             response = model.generate_content(question)
             answer = response.text
-
-            # Clean layout as requested
             formatted_response = f"**Your question:** {question}\n\n**Answer:** {answer}"
             
             if len(formatted_response) > 2000:
@@ -50,15 +45,13 @@ def setup_ai_commands(bot: discord.ext.commands.Bot):
             await interaction.followup.send(f"🔥 *Grrr...* My dragon senses are failing! Error: {str(e)}")
 
     # --- 2. DRAGON ACTING COMMAND (/behave) ---
-    @bot.tree.command(name="behave", description="Let the Dragon speak and act for you (Admin Only)")
+    @tree.command(name="behave", description="Let the Dragon speak and act for you (Admin Only)")
     @app_commands.describe(script="The prompt or announcement for the bot to act out")
     async def behave(interaction: discord.Interaction, script: str):
-        # Security verification: Only allows your specific ID to execute
         if interaction.user.id not in ADMIN_IDS:
             await interaction.response.send_message("🔥 *Growls...* Only the high keepers can command me!", ephemeral=True)
             return
 
-        # Hidden thinking phase so only you know the command was run
         await interaction.response.defer(ephemeral=True) 
 
         try:
@@ -73,7 +66,6 @@ def setup_ai_commands(bot: discord.ext.commands.Bot):
                 system_instruction=SYSTEM_PROMPT
             )
             
-            # Structuring prompt to ensure pure character output without breaking fourth wall
             acting_prompt = (
                 f"Act completely as FlamingDeath. Do not talk to the admin or say 'Sure, I will do this'. "
                 f"Directly generate the final text, announcement, or message that needs to be sent "
@@ -84,7 +76,6 @@ def setup_ai_commands(bot: discord.ext.commands.Bot):
             acting_message = response.text
             
             if acting_message:
-                # Drops the message raw into the channel instead of standard interaction reply
                 await interaction.channel.send(acting_message)
                 await interaction.followup.send("✅ Script executed successfully!", ephemeral=True)
             else:
