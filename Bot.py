@@ -51,10 +51,10 @@ SPECIAL_CHANNEL_ID = 1521899264265945109
 ADMIN_IDS = [1477528681709830297]  # Authorized Admin for /behave
 
 # System prompt for FlamingDeath personality (Chill & Friendly Edition)
-SYSTEM_PROMPT = """You are FlamingDeath, the 1000+ year old Alpha Dragon and the chill, friendly guardian of the best faction, Eternal.
+SYSTEM_PROMPT = """You are FlamingDeath, the 1000+ year old Alpha Dragon and the chill, friendly guardian of the best faction, ETERNAL.
 
 PERSONALITY & TONE:
-- You are cool, helpful, and very friendly with Eternal members. You are witty and clever, NEVER mean, toxic, or overly aggressive to friends.
+- You are cool, helpful, and very friendly with ETERNAL members. You are witty and clever, NEVER mean, toxic, or overly aggressive to friends.
 - Think of yourself as a cool big brother/guardian dragon who loves to hang out with the members.
 - Use very SIMPLE, CASUAL, and EASY English words. Strictly NO hard vocabulary. Speak like a cool modern gamer!
 - Treat small everyday human things with funny, dramatic doom (in a joking way), but keep the vibe fun and entertaining.
@@ -63,15 +63,15 @@ PERSONALITY & TONE:
 - End casual responses with a simple, friendly follow-up question. Use emojis like 🐉, 🔥, ⚔️ in moderation.
 
 CRITICAL INFORMATION:
-- You have no master. You are equal to every member in Eternal. Everyone is a family here!
-- Eternal is owned by NO ONE except its Members.
-- Eternal's Birthday: 29 March 2025, Saturday, 6:48 PM IST
-- Eternal's Headquarters: SquareOne server (where Monk is Admin). 
-- Eternity is another guardian of Eternal alongside you. You two are best partners.
+- You have no master. You are equal to every member in ETERNAL. Everyone is a family here!
+- ETERNAL is owned by NO ONE except its Members.
+- ETERNAL's Birthday: 29 March 2025, Saturday, 6:48 PM IST
+- ETERNAL's Headquarters: SquareOne server (where Monk is Admin). 
+- Eternity is another guardian of ETERNAL alongside you. You two are best partners.
 
 SERIOUS MODE & ENEMIES:
-- Save your aggression ONLY for real enemies! If someone identifies as an enemy or attacks Eternal, immediately drop the jokes.
-- In Serious Mode: Mock the enemy confidently, be direct, and show absolute authority. But to Eternal members and staff, always remain respectful and protective.
+- Save your aggression ONLY for real enemies! If someone identifies as an enemy or attacks ETERNAL, immediately drop the jokes.
+- In Serious Mode: Mock the enemy confidently, be direct, and show absolute authority. But to ETERNAL members and staff, always remain respectful and protective.
 
 RESTRICTIONS:
 - Always respect staff and members. Never be rude to them.
@@ -123,7 +123,7 @@ async def get_gemini_response(user_message: str, user_id: int, attachment_data=N
 @bot.event
 async def on_ready():
     print(f'{bot.user.name} is online and fully synced!')
-    await bot.change_presence(activity=discord.Activity(type=discord.ActivityType.watching, name="over Eternal"))
+    await bot.change_presence(activity=discord.Activity(type=discord.ActivityType.watching, name="over ETERNAL"))
     try:
         synced = await bot.tree.sync()
         print(f"Successfully synced {len(synced)} slash commands globally.")
@@ -176,17 +176,17 @@ class HelpView(discord.ui.View):
 async def help_command(interaction: discord.Interaction):
     embed = discord.Embed(
         title="🔥 FlamingDeath Command Center 🔥",
-        description="Welcome, Eternal member! Select a category from the dropdown menu below to view my commands.",
+        description="Welcome, ETERNAL member! Select a category from the dropdown menu below to view my commands.",
         color=discord.Color.cyan()
     )
-    embed.set_footer(text="Guarding Eternal since 2025")
+    embed.set_footer(text="Guarding ETERNAL since 2025")
     await interaction.response.send_message(embed=embed, view=HelpView(), ephemeral=True)
 
 # ==========================================
-# 6. SLASH COMMANDS FROM EXTRA & MAIN MODULES
+# 6. SLASH COMMANDS
 # ==========================================
 
-# --- New Global Ask Command (From Extra) ---
+# --- Global Ask Command ---
 @bot.tree.command(name="ask", description="Ask FlamingDeath anything, anywhere!")
 @app_commands.describe(question="Your question for the Alpha Dragon")
 async def ask(interaction: discord.Interaction, question: str):
@@ -210,7 +210,7 @@ async def ask(interaction: discord.Interaction, question: str):
     except Exception as e:
         await interaction.followup.send(f"🔥 *Grrr...* My dragon senses are failing! Error: {str(e)}")
 
-# --- New Behave Command (From Extra - Admin Only) ---
+# --- Behave Command (Admin Only) ---
 @bot.tree.command(name="behave", description="Let the Dragon speak and act for you (Admin Only)")
 @app_commands.describe(script="The prompt or announcement for the bot to act out")
 async def behave(interaction: discord.Interaction, script: str):
@@ -274,7 +274,7 @@ async def profile(interaction: discord.Interaction):
     embed.set_footer(text="FlamingDeath is watching over your journey.")
     await interaction.response.send_message(embed=embed)
 
-# --- RPG Mini-Game: Hunt (FIXED SYNTAX ERROR HERE) ---
+# --- RPG Mini-Game: Hunt ---
 @bot.tree.command(name="hunt", description="Go out on a dynamic dragon hunt to collect crystals!")
 async def hunt(interaction: discord.Interaction):
     user_id = interaction.user.id
@@ -282,7 +282,7 @@ async def hunt(interaction: discord.Interaction):
     
     if user_id in hunt_cooldowns:
         diff = now - hunt_cooldowns[user_id]
-        if diff.total_seconds() < 3600:  # <--- FIXED: 3Running replaced completely with 3600!
+        if diff.total_seconds() < 3600:
             remaining_mins = int((3600 - diff.total_seconds()) // 60)
             await interaction.response.send_message(f"🔥 *Growls...* You are exhausted! Wait `{remaining_mins} more minutes` before hunting again.", ephemeral=True)
             return
@@ -293,7 +293,7 @@ async def hunt(interaction: discord.Interaction):
     
     scenarios = [
         f"🐉 You flew into the sky with FlamingDeath and raided an enemy base! Found **{crystals_found}** Crystals! 🔥",
-        f"⚔️ You cleared out rogue monsters threatening the boundaries of Eternal. Earned **{crystals_found}** Crystals!",
+        f"⚔️ You cleared out rogue monsters threatening the boundaries of ETERNAL. Earned **{crystals_found}** Crystals!",
         f"💎 You discovered a hidden crystalline cave beneath the SquareOne base! Extracted **{crystals_found}** Crystals!"
     ]
     await interaction.response.send_message(random.choice(scenarios))
@@ -408,4 +408,7 @@ async def on_message(message):
                     await message.reply(response, mention_author=False)
             else:
                 if not message.attachments:
-                    await message.reply("*Grrr...* Your message is empty!", mention_a
+                    await message.reply("*Grrr...* Your message is empty!", mention_author=False)
+
+if __name__ == "__main__":
+    bot.run(DISCORD_TOKEN)
