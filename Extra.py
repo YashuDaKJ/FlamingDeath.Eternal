@@ -12,7 +12,6 @@ def setup_extra_commands(tree: app_commands.CommandTree):
 - Keep responses short, witty, and clear.
 - Start casual messages with a playful dragon roar/growl (e.g., *Grrr...*, *ROAARRR!*)."""
 
-    # --- 1. DRAGON ASK COMMAND (/ask) ---
     @tree.command(name="ask", description="Ask FlamingDeath anything, anywhere!")
     @app_commands.describe(question="Your question for the Alpha Dragon")
     async def ask(interaction: discord.Interaction, question: str):
@@ -44,7 +43,6 @@ def setup_extra_commands(tree: app_commands.CommandTree):
         except Exception as e:
             await interaction.followup.send(f"🔥 *Grrr...* My dragon senses are failing! Error: {str(e)}")
 
-    # --- 2. DRAGON ACTING COMMAND (/behave) ---
     @tree.command(name="behave", description="Let the Dragon speak and act for you (Admin Only)")
     @app_commands.describe(script="The prompt or announcement for the bot to act out")
     async def behave(interaction: discord.Interaction, script: str):
@@ -83,4 +81,4 @@ def setup_extra_commands(tree: app_commands.CommandTree):
                 
         except Exception as e:
             await interaction.followup.send(f"🔥 Acting error: {str(e)}", ephemeral=True)
-            
+                
