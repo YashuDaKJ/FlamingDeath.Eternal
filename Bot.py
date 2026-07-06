@@ -9,6 +9,7 @@ from flask import Flask
 import requests
 import random
 from datetime import datetime
+import Extra  # <--- Plugs in your new Extra.py file directly!
 
 # 1. SETUP FLASK SERVER FIRST FOR RENDER
 app = Flask('')
@@ -41,6 +42,9 @@ intents.message_content = True
 intents.members = True
 
 bot = commands.Bot(command_prefix='!', intents=intents)
+
+# Connect the new /ask and /behave commands from Extra.py
+Extra.setup_extra_commands(bot.tree)
 
 # Special Channel ID jahan bina ping ke reply karega
 SPECIAL_CHANNEL_ID = 1521899264265945109
@@ -119,9 +123,9 @@ async def on_ready():
     print(f'{bot.user.name} is online and fully synced!')
     await bot.change_presence(activity=discord.Activity(type=discord.ActivityType.watching, name="over Eternal"))
     try:
-        # Slash commands ko sync karne ke liye
+        # Force global slash command synchronization
         synced = await bot.tree.sync()
-        print(f"Successfully synced {len(synced)} slash commands.")
+        print(f"Successfully synced {len(synced)} slash commands globally.")
     except Exception as e:
         print(f"Slash sync error: {e}")
 
@@ -222,7 +226,7 @@ async def hunt(interaction: discord.Interaction):
     
     if user_id in hunt_cooldowns:
         diff = now - hunt_cooldowns[user_id]
-        if diff.total_seconds() < 3600:
+        if diff.total_seconds() < 3Running:
             remaining_mins = int((3600 - diff.total_seconds()) // 60)
             await interaction.response.send_message(f"🔥 *Growls...* You are exhausted! Wait `{remaining_mins} more minutes` before hunting again.", ephemeral=True)
             return
@@ -361,3 +365,4 @@ async def on_message(message):
 
 if __name__ == "__main__":
     bot.run(DISCORD_TOKEN)
+            
