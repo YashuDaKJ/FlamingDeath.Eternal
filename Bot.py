@@ -413,4 +413,4 @@ async def on_message(message):
                     await message.reply(response, mention_author=False)
             else:
                 if not message.attachments:
-            
+                                   
