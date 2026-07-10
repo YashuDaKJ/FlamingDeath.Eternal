@@ -413,4 +413,9 @@ async def on_message(message):
                     await message.reply(response, mention_author=False)
             else:
                 if not message.attachments:
+                    await message.reply("*Grrr...* Your message is empty!", mention_author=False)
+
+if __name__ == "__main__":
+    bot.run(DISCORD_TOKEN)
+    
                            
