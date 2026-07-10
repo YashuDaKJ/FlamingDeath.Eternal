@@ -360,7 +360,12 @@ async def slots(interaction: discord.Interaction):
 # ==========================================
 @bot.event
 async def on_message(message):
-    if message.author == bot.user:
+    # 1. CRITICAL LOOP FIX: Ignore messages from ALL bots (including Eternity and itself)
+    if message.author.bot:
+        return
+        
+    # 2. ANTI-SPAM FIX: Ignore any message that mentions @everyone or @here
+    if message.mention_everyone:
         return
     
     await bot.process_commands(message)
@@ -408,7 +413,4 @@ async def on_message(message):
                     await message.reply(response, mention_author=False)
             else:
                 if not message.attachments:
-                    await message.reply("*Grrr...* Your message is empty!", mention_author=False)
-
-if __name__ == "__main__":
-    bot.run(DISCORD_TOKEN)
+            
