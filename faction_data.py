@@ -1,7 +1,7 @@
 # faction_data.py
 
 FACTION_PROMPT = """
-ADDITIONAL KNOWLEDGE BASE & FACTION INFORMATION:
+ADDITIONAL KNOWLEDGE BASE BOOKS & FACTION INFORMATION:
 The Ways of the Faction: Strategy and Growth
 
 To make our faction the strongest and most respected on the server, we all need to work together with a clear plan. This book explains exactly how our main base operates and how we handle visitors.
@@ -54,4 +54,4 @@ How to Help:
 We have many bases, and keeping these projects moving forward takes teamwork. If you want to help out with the construction or support these builds, please contact the faction staff team. 
 
 The staff team will give you the details on what needs to be done and how you can get involved safely. Do not let outsiders follow you, beware of enemies, and do not let them into any of our sites. 
-
+"""
