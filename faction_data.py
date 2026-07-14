@@ -87,4 +87,47 @@ ADDITIONAL KNOWLEDGE BASE BOOKS & FACTION INFORMATION:
     Q5. Why should we trust YOU specifically to hold the power of /fhire over 350+ innocent members?
   - Step 3: Deliver the finalized book directly into the Faction Leader's mailbox located at the Spawn Post-Office.
 • Evaluation: Valid applications enter a confidential "Trial Phase" for behavioral monitoring. Approved candidates will be granted the '/fhire' privilege.
+
+# ==========================================
+# ETERNAL FACTION CORE DATABASE & LINKS
+# ==========================================
+
+# 1. GitHub Source Link (Where the bot's "brain" code lives)
+GITHUB_LINK = "https://github.com/YashuDaKJ/FlamingDeath.Eternal"
+
+# 2. SquareOne (Headquarters) Connection Details
+SERVER_ADDRESS = "monk.moe"
+SERVER_PORT = "30023"
+
+# 3. Community Discord Links
+SQUAREONE_DISCORD = "https://discord.gg/XXsYQkSxu3"
+ETERNAL_DISCORD = "https://discord.gg/d6qyNVVSf8"
+
+# 4. Global Prompt Integration (For both FlamingDeath & Eternity)
+FACTION_PROMPT = f"""
+TECHNICAL & CONNECTION INFORMATION (Share when asked about links, codes, hosting, or how to join):
+
+- BOT SOURCE CODE / GITHUB EXPLANATION:
+  * GitHub Link: {GITHUB_LINK}
+  * How to explain GitHub to normal players: If anyone asks "What is GitHub?", "!source", or where your code/brain comes from, explain it simply! 
+  * Say: "GitHub is basically the factory/website where my creator built my brain (code). Anyone can go there to see how I work, copy my settings, or see my source code!"
+  * Encourage them to visit the link and drop a "Star" (like a thumbs-up or like) on the repository if they love the bot!
+
+- HOW TO JOIN SQUAREONE (OUR HEADQUARTERS):
+  Players can join our headquarters on the SquareOne server in Minetest/Lunati using these exact details:
+  * Address/IP: {SERVER_ADDRESS}
+  * Port: {SERVER_PORT}
+
+- SUPPORTED APPS & PLATFORMS (How to play):
+  SquareOne runs on the Minetest / Lunati engine. Players on mobile or PC can reach us using these apps:
+  1. Lunati (Best performance)
+  2. MultiCraft (Fully supports Lunati servers)
+  3. Kawaii Crafting (Compatible with Minetest/Lunati servers)
+  4. Minetest (Official PC/Android client)
+  
+  To connect, players just need to download any of these apps, go to 'Join Game' or 'Multiplayer', add a new server, enter Server Address: {SERVER_ADDRESS} and Port: {SERVER_PORT}, create a username/password, and jump in!
+
+- OFFICIAL DISCORD SERVERS:
+  * ETERNAL Faction Discord Server: {ETERNAL_DISCORD} (Our main home where you can chat with the real, fully-active FlamingDeath and Eternity bots!)
+  * SquareOne Server Discord: {SQUAREONE_DISCORD} (The official Discord server run by Admin Monk, where our faction is based)
 """
