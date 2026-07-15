@@ -1,21 +1,41 @@
-MIT License
+CUSTOM SOURCE-AVAILABLE LICENSE (WITH REVOCATION RIGHT)
 
-Copyright (c) 2026 YashuDaKJ
+Copyright (c) 2026 YashuDaKJ. All Rights Reserved.
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+This software is NOT an Open Source Initiative (OSI) approved software. 
+It is a proprietary, source-available program. By downloading, reading, 
+hosting, or using any part of this repository, you agree to the following terms:
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+1. GRANT OF LICENSE (EDUCATIONAL USE ONLY):
+   You are granted a limited, personal, non-exclusive, non-transferable 
+   permission to read, analyze, and learn from this codebase for educational 
+   purposes.
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+2. STRICT PROHIBITIONS:
+   - You are STRICTLY PROHIBITED from duplicating, re-hosting, or running 
+     clones of the bots "FlamingDeath" or "Eternity" for public deployment 
+     or in independent/rival servers without the explicit written consent 
+     of the copyright holder (YashuDaKJ).
+   - The custom personality prompts, faction data (including but not limited 
+     to faction_data.py), and Eternal Faction specific configuration files 
+     remain the exclusive intellectual property of YashuDaKJ.
+
+3. UNILATERAL REVOCATION (THE "MARJI" CLAUSE):
+   The copyright holder (YashuDaKJ) reserves the absolute, unilateral right 
+   to revoke this license and terminate permissions for ANY user, at ANY time, 
+   with or without cause. 
+
+   Upon receiving a written notice or public declaration of revocation from 
+   YashuDaKJ, you must IMMEDIATELY:
+   - Cease all running instances of the software.
+   - Delete all local and hosted copies of the repository.
+   - Remove any derivative code from your systems.
+
+4. ATTRIBUTION REQUIRED (CREDITS):
+   If you use any permitted structural part of this code in any project, 
+   clear and visible credit MUST be given to "YashuDaKJ" and the "Eternal Faction". 
+   Failure to do so immediately invalidates this license.
+
+5. NO WARRANTY:
+   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND. IN NO EVENT 
+   SHALL THE AUTHOR BE LIABLE FOR ANY CLAIM, DAMAGES, OR OTHER LIABILITY.
