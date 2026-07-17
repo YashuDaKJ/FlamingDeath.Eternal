@@ -219,4 +219,5 @@ __marimo__/
 
 # Private Files to Hide
 faction_data.py
+faction_memory.json
 
