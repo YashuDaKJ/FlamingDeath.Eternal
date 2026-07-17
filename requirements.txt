@@ -8,6 +8,4 @@ pillow
 orjson
 uvloop
 aiodns
-cchardet
-
-
+faust-cchardet
