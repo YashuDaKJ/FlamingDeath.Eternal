@@ -5,11 +5,47 @@ from discord import app_commands
 import google.generativeai as genai
 import requests
 import random
+import os
+import json
 from datetime import datetime
+from bs4 import BeautifulSoup
 import faction_data  # Import the secret data file
 
 SPECIAL_CHANNEL_ID = 1521899264265945109
 ADMIN_IDS = [1477528681709830297]
+MEMORY_FILE = "faction_memory.json"
+
+# --- MEMORY HELPER FUNCTIONS ---
+def load_faction_memory():
+    if not os.path.exists(MEMORY_FILE):
+        return {}
+    with open(MEMORY_FILE, 'r', encoding='utf-8') as f:
+        return json.load(f)
+
+def save_faction_memory(key, value):
+    memory = load_faction_memory()
+    memory[key.lower()] = value
+    with open(MEMORY_FILE, 'w', encoding='utf-8') as f:
+        json.dump(memory, f, indent=4)
+
+# --- WEB READER HELPER FUNCTION ---
+def fetch_web_content(url):
+    try:
+        headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
+        response = requests.get(url, headers=headers, timeout=10)
+        if response.status_code != 200:
+            return "Error: Website open nahi ho rahi hai (Status Code issue)."
+            
+        soup = BeautifulSoup(response.text, 'html.parser')
+        for script in soup(["script", "style"]): 
+            script.extract() # Fuzool scripts hatao
+            
+        text = soup.get_text()
+        lines = (line.strip() for line in text.splitlines())
+        clean_text = '\n'.join(chunk for chunk in lines if chunk)
+        return clean_text[:1500] # Pehle 1500 characters padhne ke liye
+    except Exception as e:
+        return f"Error: {str(e)}"
 
 class HelpDropdown(discord.ui.Select):
     def __init__(self):
@@ -25,6 +61,9 @@ class HelpDropdown(discord.ui.Select):
             embed = discord.Embed(title="🐉 General Commands", color=discord.Color.blue())
             embed.add_field(name="`!ping`", value="Check the bot's speed.", inline=False)
             embed.add_field(name="`/ask`", value="Ask FlamingDeath a question from anywhere in the server.", inline=False)
+            embed.add_field(name="`/remember`", value="Make the dragon remember faction info.", inline=False)
+            embed.add_field(name="`/recall`", value="Ask the dragon to recall remembered info.", inline=False)
+            embed.add_field(name="`/readweb`", value="Provide a link and let the dragon read it.", inline=False)
             embed.add_field(name="💬 Chat Mode", value=f"Talk to me directly in <#{SPECIAL_CHANNEL_ID}> without pings!", inline=False)
             await interaction.response.edit_message(embed=embed)
         elif self.values[0] == "AI Multimedia":
@@ -79,6 +118,45 @@ class FactionBotCommands(commands.Cog):
                 await interaction.followup.send(formatted_response)
         except Exception as e:
             await interaction.followup.send(f"🔥 *Grrr...* Error: {str(e)}")
+
+    # 1. New Memory Box: Remember Command
+    @app_commands.command(name="remember", description="Make the Dragon remember a faction detail or rule")
+    async def remember(self, interaction: discord.Interaction, topic: str, information: str):
+        save_faction_memory(topic, information)
+        await interaction.response.send_message(f"📥 **Memory Updated!** Maine yaad rakh liya hai ki `{topic}` kya hai.")
+
+    # 2. New Memory Box: Recall Command
+    @app_commands.command(name="recall", description="Ask the Dragon to recall something it remembered")
+    async def recall(self, interaction: discord.Interaction, topic: str):
+        memory = load_faction_memory()
+        info = memory.get(topic.lower())
+        if info:
+            await interaction.response.send_message(f"🧠 **Memory Box:** `{topic}` ke baare mein mujhe ye pata hai:\n> {info}")
+        else:
+            await interaction.response.send_message(f"🔍 Sorry, mujhe `{topic}` ke baare mein kuch yaad nahi hai.")
+
+    # 3. New Web Reader Command (Connected with Gemini AI for Summarization)
+    @app_commands.command(name="readweb", description="Provide a website URL and let the Dragon read and summarize it")
+    async def readweb(self, interaction: discord.Interaction, url: str):
+        await interaction.response.defer()
+        web_raw_data = fetch_web_content(url)
+        
+        if "Error:" in web_raw_data:
+            await interaction.followup.send(f"🔥 {web_raw_data}")
+            return
+            
+        try:
+            # Passing data to Gemini so the dragon summarizes it in its personality style
+            combined_instruction = f"{faction_data.SYSTEM_PROMPT}\n\nTumhe niche di gayi website ke raw content ko read karna hai aur uski ek short, helpful summary faction members ko batani hai."
+            model = genai.GenerativeModel(model_name="gemini-2.5-flash", system_instruction=combined_instruction)
+            
+            ai_prompt = f"Website URL: {url}\nWebsite Text to read Content:\n{web_raw_data}"
+            response = model.generate_content(ai_prompt)
+            summary = response.text
+            
+            await interaction.followup.send(f"🌐 **Web Reader Report for:** {url}\n\n{summary}")
+        except Exception as e:
+            await interaction.followup.send(f"🔥 *Coughs smoke* Web read error: {str(e)}")
 
     @app_commands.command(name="behave", description="Let the Dragon speak and act for you (Admin Only)")
     async def behave(self, interaction: discord.Interaction, script: str):
@@ -192,9 +270,13 @@ async def setup(bot, conversation_history, dragon_currency, hunt_cooldowns, get_
     await bot.add_cog(cog)
     bot.tree.add_command(cog.help_command)
     bot.tree.add_command(cog.ask)
+    bot.tree.add_command(cog.remember)
+    bot.tree.add_command(cog.recall)
+    bot.tree.add_command(cog.readweb)
     bot.tree.add_command(cog.behave)
     bot.tree.add_command(cog.analyze)
     bot.tree.add_command(cog.profile)
     bot.tree.add_command(cog.hunt)
     bot.tree.add_command(cog.coinflip)
     bot.tree.add_command(cog.slots)
+    
