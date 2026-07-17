@@ -5,5 +5,9 @@ flask
 beautifulsoup4
 requests
 pillow
+orjson
+uvloop
+aiodns
+cchardet
 
 
