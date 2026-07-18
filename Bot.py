@@ -43,7 +43,12 @@ async def get_gemini_response(user_message: str, user_id: int, attachment_data=N
         
         # Load and merge both prompts from the separate file
         combined_instruction = f"{faction_data.SYSTEM_PROMPT}\n\nAdditional Faction Information:\n{faction_data.FACTION_PROMPT}"
-        model = genai.GenerativeModel('gemini-1.5-flash'), system_instruction=combined_instruction)
+        
+        # FIXED: Corrected indentation, model set to gemini-1.5-flash, and fixed bracket syntax
+        model = genai.GenerativeModel(
+            model_name='gemini-1.5-flash',
+            system_instruction=combined_instruction
+        )
         
         if attachment_data:
             response = model.generate_content([user_message, attachment_data])
@@ -56,7 +61,11 @@ async def get_gemini_response(user_message: str, user_id: int, attachment_data=N
         if len(conversation_history[user_id]) > 40: conversation_history[user_id] = conversation_history[user_id][-40:]
         return assistant_message
     except Exception as e:
-        return f"*ROAARRR!* Error: {str(e)}"
+        print(f"Error captured in FlamingDeath Gemini Call: {e}")
+        # SMART ERROR HANDLING: Dragon style error shield for 429 quota issues
+        if "429" in str(e) or "quota" in str(e).lower():
+            return "*ROAARRR!* 🎙️ *My fiery broadcast is currently choked by the static! Let the flames cool down down down down and try again in a brief moment, darling!*"
+        return f"*ROAARRR!* 🎙️ *An unexpected disturbance in the airwaves! Let us ignite the transmission again shortly.*"
 
 @bot.event
 async def on_ready():
@@ -77,7 +86,7 @@ async def on_message(message):
     await bot.process_commands(message)
     
     # -------------------------------------------------------------
-    # 🌟 NEW FEATURE: AUTOMATIC REACTION TRIGGERS
+    # 🌟 AUTOMATIC REACTION TRIGGERS
     # -------------------------------------------------------------
     content_lower = message.content.lower()
     
@@ -88,7 +97,7 @@ async def on_message(message):
         except: pass
 
     # -------------------------------------------------------------
-    # 🌟 NEW FEATURE: GIF RECOGNITION & TRIGGER RESPONSES
+    # 🌟 GIF RECOGNITION & TRIGGER RESPONSES
     # -------------------------------------------------------------
     # Check if the incoming message contains a GIF via link or attachment
     is_gif = "tenor.com" in content_lower or "giphy.com" in content_lower
@@ -97,11 +106,9 @@ async def on_message(message):
         
     if is_gif:
         print(f"⚡ [GIF Detected] in channel {message.channel.id} by {message.author}")
-        # You can add actions here if the bot needs to respond every time someone sends a GIF
 
     # Send a specific GIF when a target phrase is parsed
     if content_lower == "let's burn" or content_lower == "!firegif":
-        # Simply provide the direct link, Discord will auto-embed the media element
         dragon_gif_url = "https://tenor.com/view/dragon-fire-breathe-fire-fantasy-creature-gif-17482329"
         await message.channel.send(dragon_gif_url)
         return  # Stop execution here if you don't want the AI to reply alongside it
