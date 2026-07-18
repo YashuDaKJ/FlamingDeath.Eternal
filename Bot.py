@@ -1,4 +1,3 @@
-# bot.py
 import os
 import discord
 from discord.ext import commands
@@ -77,6 +76,37 @@ async def on_message(message):
     if message.author.bot or message.mention_everyone: return
     await bot.process_commands(message)
     
+    # -------------------------------------------------------------
+    # 🌟 NEW FEATURE: AUTOMATIC REACTION TRIGGERS
+    # -------------------------------------------------------------
+    content_lower = message.content.lower()
+    
+    # Simple keyword reaction example
+    if "nice" in content_lower:
+        try:
+            await message.add_reaction("🔥")
+        except: pass
+
+    # -------------------------------------------------------------
+    # 🌟 NEW FEATURE: GIF RECOGNITION & TRIGGER RESPONSES
+    # -------------------------------------------------------------
+    # Check if the incoming message contains a GIF via link or attachment
+    is_gif = "tenor.com" in content_lower or "giphy.com" in content_lower
+    if not is_gif and message.attachments:
+        is_gif = any(att.filename.lower().endswith('.gif') for att in message.attachments)
+        
+    if is_gif:
+        print(f"⚡ [GIF Detected] in channel {message.channel.id} by {message.author}")
+        # You can add actions here if the bot needs to respond every time someone sends a GIF
+
+    # Send a specific GIF when a target phrase is parsed
+    if content_lower == "let's burn" or content_lower == "!firegif":
+        # Simply provide the direct link, Discord will auto-embed the media element
+        dragon_gif_url = "https://tenor.com/view/dragon-fire-breathe-fire-fantasy-creature-gif-17482329"
+        await message.channel.send(dragon_gif_url)
+        return  # Stop execution here if you don't want the AI to reply alongside it
+    # -------------------------------------------------------------
+
     is_pinged_or_replied = bot.user.mentioned_in(message)
     if not is_pinged_or_replied and message.reference:
         try:
@@ -84,11 +114,17 @@ async def on_message(message):
             if replied_to.author == bot.user: is_pinged_or_replied = True
         except: pass
 
-    name_called = "flamingdeath" in message.content.lower()
+    name_called = "flamingdeath" in content_lower
     if (message.channel.id == SPECIAL_CHANNEL_ID) or is_pinged_or_replied or name_called:
         async with message.channel.typing():
             clean_message = message.content.replace(f'<@{bot.user.id}>', '').replace(f'<@!{bot.user.id}>', '').strip()
-            if not clean_message and message.attachments: clean_message = "Look at this file!"
+            
+            # Adjust input text if the user only uploaded a raw GIF without typing any words
+            if not clean_message and is_gif: 
+                clean_message = "Look at this GIF I sent you!"
+            elif not clean_message and message.attachments: 
+                clean_message = "Look at this file!"
+                
             if clean_message:
                 attachment_data = None
                 if message.attachments:
@@ -107,4 +143,3 @@ async def on_message(message):
 
 if __name__ == "__main__":
     bot.run(DISCORD_TOKEN)
-                         
