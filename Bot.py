@@ -43,7 +43,7 @@ async def get_gemini_response(user_message: str, user_id: int, attachment_data=N
         
         # Load and merge both prompts from the separate file
         combined_instruction = f"{faction_data.SYSTEM_PROMPT}\n\nAdditional Faction Information:\n{faction_data.FACTION_PROMPT}"
-        model = genai.GenerativeModel(model_name="gemini-2.5-flash", system_instruction=combined_instruction)
+        model = genai.GenerativeModel('gemini-1.5-flash'), system_instruction=combined_instruction)
         
         if attachment_data:
             response = model.generate_content([user_message, attachment_data])
