@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="https://cdn.discordapp.com/attachments/1492172037500698758/1528035129593696326/IMG_20260712_150837-removebg-preview.png?ex=6a5cd51c&is=6a5b839c&hm=75b9431811d03080c2800492e6c53fd0829ae7237c583210f79a9ba0747a987d&" alt="FlamingDeath Logo" width="200"/>
+</p>
+  
 # 🔥 FlamingDeath | Eternal Faction Dragon Co-Guardian
 
 Welcome to the official repository of **FlamingDeath**, the powerful, quick-witted Dragon co-guardian of the **ETERNAL** faction! Built with Python, Discord.py, and integrated with the Gemini 2.5 Flash engine for high-tier server interaction, gaming roleplay, and multimedia analysis.
