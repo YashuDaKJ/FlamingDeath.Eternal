@@ -106,9 +106,11 @@ class FactionBotCommands(commands.Cog):
     async def ask(self, interaction: discord.Interaction, question: str):
         await interaction.response.defer()
         try:
-            # FIXED: Added Faction Prompt and changed model to gemini-2.5-flash-lite
+            # Combined Faction Prompt setup
             combined_instruction = f"{faction_data.SYSTEM_PROMPT}\n\nAdditional Faction Information:\n{faction_data.FACTION_PROMPT}"
-            model = genai.GenerativeModel(model_name='gemini-2.5-flash-lite', system_instruction=combined_instruction)
+            
+            # FIXED: Model name shifted to the correct 'gemini-2.5-flash'
+            model = genai.GenerativeModel(model_name='gemini-2.5-flash', system_instruction=combined_instruction)
             
             response = model.generate_content(question)
             answer = response.text
@@ -149,9 +151,10 @@ class FactionBotCommands(commands.Cog):
             return
             
         try:
-            # FIXED: Added Faction Prompt and changed model to gemini-2.5-flash-lite
             combined_instruction = f"{faction_data.SYSTEM_PROMPT}\n\nAdditional Faction Information:\n{faction_data.FACTION_PROMPT}\n\nTumhe niche di gayi website ke raw content ko read karna hai aur uski ek short, helpful summary faction members ko batani hai."
-            model = genai.GenerativeModel(model_name="gemini-2.5-flash-lite", system_instruction=combined_instruction)
+            
+            # FIXED: Model name shifted to 'gemini-2.5-flash' to fix 404 deployment error
+            model = genai.GenerativeModel(model_name="gemini-2.5-flash", system_instruction=combined_instruction)
             
             ai_prompt = f"Website URL: {url}\nWebsite Text to read Content:\n{web_raw_data}"
             response = model.generate_content(ai_prompt)
@@ -171,9 +174,10 @@ class FactionBotCommands(commands.Cog):
             return
         await interaction.response.defer(ephemeral=True)
         try:
-            # FIXED: Added Faction Prompt and changed model to gemini-2.5-flash-lite
             combined_instruction = f"{faction_data.SYSTEM_PROMPT}\n\nAdditional Faction Information:\n{faction_data.FACTION_PROMPT}"
-            model = genai.GenerativeModel(model_name='gemini-2.5-flash-lite', system_instruction=combined_instruction)
+            
+            # FIXED: Model changed to 'gemini-2.5-flash' for stability
+            model = genai.GenerativeModel(model_name='gemini-2.5-flash', system_instruction=combined_instruction)
             
             acting_prompt = f"Act completely as FlamingDeath. Directly generate the final text based on this script: {script}"
             response = model.generate_content(acting_prompt)
@@ -291,4 +295,4 @@ async def setup(bot, conversation_history, dragon_currency, hunt_cooldowns, get_
     bot.tree.add_command(cog.hunt)
     bot.tree.add_command(cog.coinflip)
     bot.tree.add_command(cog.slots)
-        
+    
