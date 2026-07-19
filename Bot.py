@@ -44,9 +44,9 @@ async def get_gemini_response(user_message: str, user_id: int, attachment_data=N
         # Load and merge both prompts from the separate file
         combined_instruction = f"{faction_data.SYSTEM_PROMPT}\n\nAdditional Faction Information:\n{faction_data.FACTION_PROMPT}"
         
-        # FIXED: Model changed to gemini-2.5-flash-lite for higher free limits!
+        # FIXED: Model changed to stable gemini-2.5-flash to eliminate 404 and quota exceptions!
         model = genai.GenerativeModel(
-            model_name='gemini-2.5-flash-lite',
+            model_name='gemini-2.5-flash',
             system_instruction=combined_instruction
         )
         
@@ -147,4 +147,3 @@ async def on_message(message):
 
 if __name__ == "__main__":
     bot.run(DISCORD_TOKEN)
-    
