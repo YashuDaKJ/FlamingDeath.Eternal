@@ -38,12 +38,12 @@ def fetch_web_content(url):
             
         soup = BeautifulSoup(response.text, 'html.parser')
         for script in soup(["script", "style"]): 
-            script.extract() # Fuzool scripts hatao
+            script.extract() # fixed
             
         text = soup.get_text()
         lines = (line.strip() for line in text.splitlines())
         clean_text = '\n'.join(chunk for chunk in lines if chunk)
-        return clean_text[:1500] # Pehle 1500 characters padhne ke liye
+        return clean_text[:1500] # fixed
     except Exception as e:
         return f"Error: {str(e)}"
 
