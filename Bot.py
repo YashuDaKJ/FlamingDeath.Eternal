@@ -6,6 +6,7 @@ from threading import Thread
 from flask import Flask
 import requests
 import time  # ⏱️ Perfect loop tracker for chat system cooldowns
+import motor.motor_asyncio  # Async MongoDB driver for discord.py
 
 # Import the separated local files
 import faction_data
@@ -23,6 +24,8 @@ Thread(target=run_web_server, daemon=True).start()
 
 DISCORD_TOKEN = os.getenv('DISCORD_TOKEN')
 GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
+MONGO_URI = os.getenv('MONGO_URI')  # 🛰️ Linked directly to ClusterEternal variable
+
 if not DISCORD_TOKEN or not GEMINI_API_KEY:
     raise ValueError("DISCORD_TOKEN and GEMINI_API_KEY must be set!")
 
@@ -31,12 +34,32 @@ genai.configure(api_key=GEMINI_API_KEY)
 intents = discord.Intents.default()
 intents.message_content = True
 intents.members = True
-bot = commands.Bot(command_prefix='!', intents=intents)
+
+# Custom Bot Subclass setup to match Eternity's database structural connection
+class FlamingDeathBot(commands.Bot):
+    def __init__(self):
+        super().__init__(command_prefix='!', intents=intents)
+        
+        # Initialize Database connection variables
+        if not MONGO_URI:
+            print("⚠️ WARNING: MONGO_URI environment variable is missing! Database features will fail.")
+            self.db_client = None
+            self.db = None
+            self.profiles = None
+        else:
+            self.db_client = motor.motor_asyncio.AsyncIOMotorClient(MONGO_URI)
+            self.db = self.db_client["eternal_faction_db"]  # Shares the EXACT same DB workspace
+            self.profiles = self.db["user_profiles"]         # Synchronized user ledger
+            print("🔥 MongoDB Atlas Pipeline: FlamingDeath connected to ClusterEternal successfully!")
+
+bot = FlamingDeathBot()
 
 SPECIAL_CHANNEL_ID = 1521899264265945109
 conversation_history = {}
-dragon_currency = {}  
-hunt_cooldowns = {}
+
+# 🟢 UPGRADE: Local economy/cooldown dictionaries removed! 
+# Data queries now leverage self.profiles for permanent persistence across server restarts.
+
 # ⏱️ Chat cooldown tracking array
 chat_cooldowns = {}
 
@@ -79,7 +102,8 @@ async def on_ready():
     await bot.change_presence(activity=discord.Activity(type=discord.ActivityType.watching, name="over Eternal"))
     
     try:
-        await bot_commands.setup(bot, conversation_history, dragon_currency, hunt_cooldowns, get_gemini_response)
+        # Pass the bot client instance cleanly to let commands hook into bot.profiles database paths
+        await bot_commands.setup(bot, conversation_history, get_gemini_response)
         synced = await bot.tree.sync()
         print(f"Synced {len(synced)} slash commands.")
     except Exception as e:
@@ -162,4 +186,3 @@ async def on_message(message):
 
 if __name__ == "__main__":
     bot.run(DISCORD_TOKEN)
-    
