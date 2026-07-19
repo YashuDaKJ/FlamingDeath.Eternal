@@ -5,7 +5,7 @@ import google.generativeai as genai
 from threading import Thread
 from flask import Flask
 import requests
-import time  # ⏱️ Cooldown track karne ke liye import kiya hai
+import time  # ⏱️ Perfect loop tracker for chat system cooldowns
 
 # Import the separated local files
 import faction_data
@@ -37,12 +37,13 @@ SPECIAL_CHANNEL_ID = 1521899264265945109
 conversation_history = {}
 dragon_currency = {}  
 hunt_cooldowns = {}
-# ⏱️ Chat cooldown track karne ke liye ek dictionary
+# ⏱️ Chat cooldown tracking array
 chat_cooldowns = {}
 
 async def get_gemini_response(user_message: str, user_id: int, attachment_data=None) -> str:
     try:
-        if user_id not in conversation_history: conversation_history[user_id] = []
+        if user_id not in conversation_history: 
+            conversation_history[user_id] = []
         
         combined_instruction = f"{faction_data.SYSTEM_PROMPT}\n\nAdditional Faction Information:\n{faction_data.FACTION_PROMPT}"
         
@@ -56,14 +57,15 @@ async def get_gemini_response(user_message: str, user_id: int, attachment_data=N
             return response.text
             
         conversation_history[user_id].append({"role": "user", "parts": [user_message]})
+        
+        # 📈 OPTIMIZATION: Truncate context BEFORE sending request to guarantee token conservation
+        if len(conversation_history[user_id]) > 15: 
+            conversation_history[user_id] = conversation_history[user_id][-15:]
+            
         response = model.generate_content(conversation_history[user_id])
         assistant_message = response.text
         conversation_history[user_id].append({"role": "model", "parts": [assistant_message]})
         
-        # 📈 OPTIMIZATION: History limit 40 se 15 kar di taaki tokens save hon!
-        if len(conversation_history[user_id]) > 15: 
-            conversation_history[user_id] = conversation_history[user_id][-15:]
-            
         return assistant_message
     except Exception as e:
         print(f"Error captured in FlamingDeath Gemini Call: {e}")
@@ -86,7 +88,11 @@ async def on_ready():
 @bot.event
 async def on_message(message):
     if message.author.bot or message.mention_everyone: return
-    await bot.process_commands(message)
+    
+    # 🛡️ ARCHITECTURAL INTERCEPT: Prevent command text patterns from filtering down into the AI generator
+    if message.content.startswith(bot.command_prefix):
+        await bot.process_commands(message)
+        return
     
     content_lower = message.content.lower()
     
@@ -116,20 +122,18 @@ async def on_message(message):
     name_called = "flamingdeath" in content_lower
     if (message.channel.id == SPECIAL_CHANNEL_ID) or is_pinged_or_replied or name_called:
         
-        # ⏱️ IMPLEMENTATION: 5-Second Cooldown Check
+        # ⏱️ IMPLEMENTATION: 5-Second Cooldown Verification Matrix
         current_time = time.time()
         user_id = message.author.id
         if user_id in chat_cooldowns:
             elapsed = current_time - chat_cooldowns[user_id]
-            if elapsed < 5:  # 5 second se kam hua toh stop kar do
+            if elapsed < 5:
                 remaining = int(5 - elapsed)
                 try:
-                    # Chota ephemeral message jaisa reply jo 3 second baad khud delete ho jayega
                     await message.reply(f"⏰ *Hold your flames, champion! Wait {remaining}s before broadcasting again.*", delete_after=3)
                 except: pass
                 return
         
-        # Agar cooldown nahi laga, toh abhi ka time update karo
         chat_cooldowns[user_id] = current_time
 
         async with message.channel.typing():
@@ -158,3 +162,4 @@ async def on_message(message):
 
 if __name__ == "__main__":
     bot.run(DISCORD_TOKEN)
+    
