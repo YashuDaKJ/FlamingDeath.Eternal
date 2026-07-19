@@ -1,13 +1,14 @@
+import os
+import json
+import random
+import requests
+from datetime import datetime
+from bs4 import BeautifulSoup
+
 import discord
 from discord.ext import commands
 from discord import app_commands
 import google.generativeai as genai
-import requests
-import random
-import os
-import json
-from datetime import datetime
-from bs4 import BeautifulSoup
 import faction_data  # Import the secret data file
 
 SPECIAL_CHANNEL_ID = 1521899264265945109
@@ -58,7 +59,7 @@ class HelpDropdown(discord.ui.Select):
     async def callback(self, interaction: discord.Interaction):
         if self.values[0] == "General Commands":
             embed = discord.Embed(title="🐉 General Commands", color=discord.Color.blue())
-            embed.add_field(name="`!ping`", value="Check the bot's speed.", inline=False)
+            embed.add_field(name="`/ping`", value="Check the bot's speed.", inline=False)
             embed.add_field(name="`/ask`", value="Ask FlamingDeath a question from anywhere in the server.", inline=False)
             embed.add_field(name="`/remember`", value="Make the dragon remember faction info.", inline=False)
             embed.add_field(name="`/recall`", value="Ask the dragon to recall remembered info.", inline=False)
@@ -90,10 +91,10 @@ class FactionBotCommands(commands.Cog):
         self.hunt_cooldowns = hunt_cooldowns
         self.get_gemini_response = get_gemini_response_func
 
-    @commands.command(name='ping')
-    async def ping(self, ctx):
+    @app_commands.command(name='ping', description="Check the operational response latency matrix")
+    async def ping(self, interaction: discord.Interaction):
         latency = round(self.bot.latency * 1000)
-        await ctx.send(f"*Grrr...* Pong! My flames reached you in {latency}ms!")
+        await interaction.response.send_message(f"*Grrr...* Pong! My flames reached you in {latency}ms!")
 
     @app_commands.command(name="help", description="Show all available features of FlamingDeath")
     async def help_command(self, interaction: discord.Interaction):
@@ -102,7 +103,7 @@ class FactionBotCommands(commands.Cog):
         await interaction.response.send_message(embed=embed, view=HelpView(), ephemeral=True)
 
     @app_commands.command(name="ask", description="Ask FlamingDeath anything, anywhere!")
-    @app_commands.checks.cooldown(1, 5.0, key=lambda i: i.user.id)  # ⏱️ 5-Second Cooldown Added
+    @app_commands.checks.cooldown(1, 5.0, key=lambda i: i.user.id)  # ⏱️ 5-Second Cooldown
     async def ask(self, interaction: discord.Interaction, question: str):
         await interaction.response.defer()
         try:
@@ -139,7 +140,7 @@ class FactionBotCommands(commands.Cog):
             await interaction.response.send_message(f"🔍 Sorry, mujhe `{topic}` ke baare mein kuch yaad nahi hai.")
 
     @app_commands.command(name="readweb", description="Provide a website URL and let the Dragon read and summarize it")
-    @app_commands.checks.cooldown(1, 10.0, key=lambda i: i.user.id)  # ⏱️ Web content extraction requires a bit more breath (10s Cooldown)
+    @app_commands.checks.cooldown(1, 10.0, key=lambda i: i.user.id)  # ⏱️ 10s Cooldown for web fetching
     async def readweb(self, interaction: discord.Interaction, url: str):
         await interaction.response.defer()
         web_raw_data = fetch_web_content(url)
@@ -188,7 +189,7 @@ class FactionBotCommands(commands.Cog):
                 await interaction.followup.send(f"🔥 Acting error: {str(e)}", ephemeral=True)
 
     @app_commands.command(name="analyze", description="Let FlamingDeath look at your photos, videos, or audio files")
-    @app_commands.checks.cooldown(1, 10.0, key=lambda i: i.user.id)  # ⏱️ 10-Second Cooldown for complex multimedia uploads
+    @app_commands.checks.cooldown(1, 10.0, key=lambda i: i.user.id)  # ⏱️ 10-Second Cooldown for Media
     async def analyze(self, interaction: discord.Interaction, prompt: str, attachment: discord.Attachment):
         await interaction.response.defer()
         if not attachment.content_type:
@@ -197,7 +198,6 @@ class FactionBotCommands(commands.Cog):
         try:
             file_response = requests.get(attachment.url)
             attachment_data = {'mime_type': attachment.content_type, 'data': file_response.content}
-            # Automatically routes into optimized 15-message memory limits via the centralized call!
             response_text = await self.get_gemini_response(prompt, interaction.user.id, attachment_data)
             await interaction.followup.send(f"🐉 **FlamingDeath Vision:** {response_text}")
         except Exception as e:
@@ -293,15 +293,4 @@ class FactionBotCommands(commands.Cog):
 async def setup(bot, conversation_history, dragon_currency, hunt_cooldowns, get_gemini_response_func):
     cog = FactionBotCommands(bot, conversation_history, dragon_currency, hunt_cooldowns, get_gemini_response_func)
     await bot.add_cog(cog)
-    bot.tree.add_command(cog.help_command)
-    bot.tree.add_command(cog.ask)
-    bot.tree.add_command(cog.remember)
-    bot.tree.add_command(cog.recall)
-    bot.tree.add_command(cog.readweb)
-    bot.tree.add_command(cog.behave)
-    bot.tree.add_command(cog.analyze)
-    bot.tree.add_command(cog.profile)
-    bot.tree.add_command(cog.hunt)
-    bot.tree.add_command(cog.coinflip)
-    bot.tree.add_command(cog.slots)
-    
+        
