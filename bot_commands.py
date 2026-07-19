@@ -1,4 +1,3 @@
-# bot_commands.py
 import discord
 from discord.ext import commands
 from discord import app_commands
@@ -103,13 +102,11 @@ class FactionBotCommands(commands.Cog):
         await interaction.response.send_message(embed=embed, view=HelpView(), ephemeral=True)
 
     @app_commands.command(name="ask", description="Ask FlamingDeath anything, anywhere!")
+    @app_commands.checks.cooldown(1, 5.0, key=lambda i: i.user.id)  # ⏱️ 5-Second Cooldown Added
     async def ask(self, interaction: discord.Interaction, question: str):
         await interaction.response.defer()
         try:
-            # Combined Faction Prompt setup
             combined_instruction = f"{faction_data.SYSTEM_PROMPT}\n\nAdditional Faction Information:\n{faction_data.FACTION_PROMPT}"
-            
-            # FIXED: Model name shifted to the correct 'gemini-2.5-flash'
             model = genai.GenerativeModel(model_name='gemini-2.5-flash', system_instruction=combined_instruction)
             
             response = model.generate_content(question)
@@ -142,6 +139,7 @@ class FactionBotCommands(commands.Cog):
             await interaction.response.send_message(f"🔍 Sorry, mujhe `{topic}` ke baare mein kuch yaad nahi hai.")
 
     @app_commands.command(name="readweb", description="Provide a website URL and let the Dragon read and summarize it")
+    @app_commands.checks.cooldown(1, 10.0, key=lambda i: i.user.id)  # ⏱️ Web content extraction requires a bit more breath (10s Cooldown)
     async def readweb(self, interaction: discord.Interaction, url: str):
         await interaction.response.defer()
         web_raw_data = fetch_web_content(url)
@@ -152,8 +150,6 @@ class FactionBotCommands(commands.Cog):
             
         try:
             combined_instruction = f"{faction_data.SYSTEM_PROMPT}\n\nAdditional Faction Information:\n{faction_data.FACTION_PROMPT}\n\nTumhe niche di gayi website ke raw content ko read karna hai aur uski ek short, helpful summary faction members ko batani hai."
-            
-            # FIXED: Model name shifted to 'gemini-2.5-flash' to fix 404 deployment error
             model = genai.GenerativeModel(model_name="gemini-2.5-flash", system_instruction=combined_instruction)
             
             ai_prompt = f"Website URL: {url}\nWebsite Text to read Content:\n{web_raw_data}"
@@ -175,8 +171,6 @@ class FactionBotCommands(commands.Cog):
         await interaction.response.defer(ephemeral=True)
         try:
             combined_instruction = f"{faction_data.SYSTEM_PROMPT}\n\nAdditional Faction Information:\n{faction_data.FACTION_PROMPT}"
-            
-            # FIXED: Model changed to 'gemini-2.5-flash' for stability
             model = genai.GenerativeModel(model_name='gemini-2.5-flash', system_instruction=combined_instruction)
             
             acting_prompt = f"Act completely as FlamingDeath. Directly generate the final text based on this script: {script}"
@@ -194,6 +188,7 @@ class FactionBotCommands(commands.Cog):
                 await interaction.followup.send(f"🔥 Acting error: {str(e)}", ephemeral=True)
 
     @app_commands.command(name="analyze", description="Let FlamingDeath look at your photos, videos, or audio files")
+    @app_commands.checks.cooldown(1, 10.0, key=lambda i: i.user.id)  # ⏱️ 10-Second Cooldown for complex multimedia uploads
     async def analyze(self, interaction: discord.Interaction, prompt: str, attachment: discord.Attachment):
         await interaction.response.defer()
         if not attachment.content_type:
@@ -202,10 +197,24 @@ class FactionBotCommands(commands.Cog):
         try:
             file_response = requests.get(attachment.url)
             attachment_data = {'mime_type': attachment.content_type, 'data': file_response.content}
+            # Automatically routes into optimized 15-message memory limits via the centralized call!
             response_text = await self.get_gemini_response(prompt, interaction.user.id, attachment_data)
             await interaction.followup.send(f"🐉 **FlamingDeath Vision:** {response_text}")
         except Exception as e:
             await interaction.followup.send(f"🔥 *Coughs smoke* Error: {str(e)}")
+
+    # --- Error Handler for Slash Commands Cooldowns ---
+    @ask.error
+    @readweb.error
+    @analyze.error
+    async def command_cooldown_error_handler(self, interaction: discord.Interaction, error: app_commands.AppCommandError):
+        if isinstance(error, app_commands.CommandOnCooldown):
+            await interaction.response.send_message(
+                f"⏰ *Hold your horses, warrior! This command is cooling down. Try again in {error.retry_after:.1f}s.*", 
+                ephemeral=True
+            )
+        else:
+            await interaction.response.send_message(f"🔥 An execution error occurred: {str(error)}", ephemeral=True)
 
     @app_commands.command(name="profile", description="Check your Eternal faction member card")
     async def profile(self, interaction: discord.Interaction):
