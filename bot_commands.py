@@ -106,7 +106,10 @@ class FactionBotCommands(commands.Cog):
     async def ask(self, interaction: discord.Interaction, question: str):
         await interaction.response.defer()
         try:
-            model = genai.GenerativeModel(model_name='gemini-2.5-flash', system_instruction=faction_data.SYSTEM_PROMPT)
+            # FIXED: Added Faction Prompt and changed model to gemini-2.5-flash-lite
+            combined_instruction = f"{faction_data.SYSTEM_PROMPT}\n\nAdditional Faction Information:\n{faction_data.FACTION_PROMPT}"
+            model = genai.GenerativeModel(model_name='gemini-2.5-flash-lite', system_instruction=combined_instruction)
+            
             response = model.generate_content(question)
             answer = response.text
             formatted_response = f"**Your question:** {question}\n\n**Answer:** {answer}"
@@ -117,15 +120,16 @@ class FactionBotCommands(commands.Cog):
             else:
                 await interaction.followup.send(formatted_response)
         except Exception as e:
-            await interaction.followup.send(f"🔥 *Grrr...* Error: {str(e)}")
+            if "429" in str(e) or "quota" in str(e).lower():
+                await interaction.followup.send("🔥 *ROAARRR!* My fiery broadcast is currently choked by the static! Let the flames cool down and try again shortly!")
+            else:
+                await interaction.followup.send(f"🔥 *Grrr...* Error: {str(e)}")
 
-    # 1. New Memory Box: Remember Command
     @app_commands.command(name="remember", description="Make the Dragon remember a faction detail or rule")
     async def remember(self, interaction: discord.Interaction, topic: str, information: str):
         save_faction_memory(topic, information)
         await interaction.response.send_message(f"📥 **Memory Updated!** Maine yaad rakh liya hai ki `{topic}` kya hai.")
 
-    # 2. New Memory Box: Recall Command
     @app_commands.command(name="recall", description="Ask the Dragon to recall something it remembered")
     async def recall(self, interaction: discord.Interaction, topic: str):
         memory = load_faction_memory()
@@ -135,7 +139,6 @@ class FactionBotCommands(commands.Cog):
         else:
             await interaction.response.send_message(f"🔍 Sorry, mujhe `{topic}` ke baare mein kuch yaad nahi hai.")
 
-    # 3. New Web Reader Command (Connected with Gemini AI for Summarization)
     @app_commands.command(name="readweb", description="Provide a website URL and let the Dragon read and summarize it")
     async def readweb(self, interaction: discord.Interaction, url: str):
         await interaction.response.defer()
@@ -146,9 +149,9 @@ class FactionBotCommands(commands.Cog):
             return
             
         try:
-            # Passing data to Gemini so the dragon summarizes it in its personality style
-            combined_instruction = f"{faction_data.SYSTEM_PROMPT}\n\nTumhe niche di gayi website ke raw content ko read karna hai aur uski ek short, helpful summary faction members ko batani hai."
-            model = genai.GenerativeModel(model_name="gemini-2.5-flash", system_instruction=combined_instruction)
+            # FIXED: Added Faction Prompt and changed model to gemini-2.5-flash-lite
+            combined_instruction = f"{faction_data.SYSTEM_PROMPT}\n\nAdditional Faction Information:\n{faction_data.FACTION_PROMPT}\n\nTumhe niche di gayi website ke raw content ko read karna hai aur uski ek short, helpful summary faction members ko batani hai."
+            model = genai.GenerativeModel(model_name="gemini-2.5-flash-lite", system_instruction=combined_instruction)
             
             ai_prompt = f"Website URL: {url}\nWebsite Text to read Content:\n{web_raw_data}"
             response = model.generate_content(ai_prompt)
@@ -156,7 +159,10 @@ class FactionBotCommands(commands.Cog):
             
             await interaction.followup.send(f"🌐 **Web Reader Report for:** {url}\n\n{summary}")
         except Exception as e:
-            await interaction.followup.send(f"🔥 *Coughs smoke* Web read error: {str(e)}")
+            if "429" in str(e) or "quota" in str(e).lower():
+                await interaction.followup.send("🔥 *ROAARRR!* My fiery broadcast is currently choked by the static! Let the flames cool down and try again shortly!")
+            else:
+                await interaction.followup.send(f"🔥 *Coughs smoke* Web read error: {str(e)}")
 
     @app_commands.command(name="behave", description="Let the Dragon speak and act for you (Admin Only)")
     async def behave(self, interaction: discord.Interaction, script: str):
@@ -165,7 +171,10 @@ class FactionBotCommands(commands.Cog):
             return
         await interaction.response.defer(ephemeral=True)
         try:
-            model = genai.GenerativeModel(model_name='gemini-2.5-flash', system_instruction=faction_data.SYSTEM_PROMPT)
+            # FIXED: Added Faction Prompt and changed model to gemini-2.5-flash-lite
+            combined_instruction = f"{faction_data.SYSTEM_PROMPT}\n\nAdditional Faction Information:\n{faction_data.FACTION_PROMPT}"
+            model = genai.GenerativeModel(model_name='gemini-2.5-flash-lite', system_instruction=combined_instruction)
+            
             acting_prompt = f"Act completely as FlamingDeath. Directly generate the final text based on this script: {script}"
             response = model.generate_content(acting_prompt)
             acting_message = response.text
@@ -175,7 +184,10 @@ class FactionBotCommands(commands.Cog):
             else:
                 await interaction.followup.send("⚠️ No message was generated.", ephemeral=True)
         except Exception as e:
-            await interaction.followup.send(f"🔥 Acting error: {str(e)}", ephemeral=True)
+            if "429" in str(e) or "quota" in str(e).lower():
+                await interaction.followup.send("🔥 *ROAARRR!* Rate limit hit! Wait a moment.", ephemeral=True)
+            else:
+                await interaction.followup.send(f"🔥 Acting error: {str(e)}", ephemeral=True)
 
     @app_commands.command(name="analyze", description="Let FlamingDeath look at your photos, videos, or audio files")
     async def analyze(self, interaction: discord.Interaction, prompt: str, attachment: discord.Attachment):
@@ -279,4 +291,4 @@ async def setup(bot, conversation_history, dragon_currency, hunt_cooldowns, get_
     bot.tree.add_command(cog.hunt)
     bot.tree.add_command(cog.coinflip)
     bot.tree.add_command(cog.slots)
-    
+        
