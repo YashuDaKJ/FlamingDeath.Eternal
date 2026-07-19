@@ -44,9 +44,9 @@ async def get_gemini_response(user_message: str, user_id: int, attachment_data=N
         # Load and merge both prompts from the separate file
         combined_instruction = f"{faction_data.SYSTEM_PROMPT}\n\nAdditional Faction Information:\n{faction_data.FACTION_PROMPT}"
         
-        # FIXED: Corrected indentation, model set to gemini-1.5-flash, and fixed bracket syntax
+        # FIXED: Model changed to gemini-2.5-flash-lite for higher free limits!
         model = genai.GenerativeModel(
-            model_name='gemini-1.5-flash',
+            model_name='gemini-2.5-flash-lite',
             system_instruction=combined_instruction
         )
         
@@ -62,9 +62,9 @@ async def get_gemini_response(user_message: str, user_id: int, attachment_data=N
         return assistant_message
     except Exception as e:
         print(f"Error captured in FlamingDeath Gemini Call: {e}")
-        # SMART ERROR HANDLING: Dragon style error shield for 429 quota issues
+        # SMART ERROR HANDLING: Cleaned up the repetition for a punchy dragon style message
         if "429" in str(e) or "quota" in str(e).lower():
-            return "*ROAARRR!* 🎙️ *My fiery broadcast is currently choked by the static! Let the flames cool down down down down and try again in a brief moment, darling!*"
+            return "*ROAARRR!* 🎙️ *My fiery broadcast is currently choked by static! Let the flames cool down for a moment, darling, and try again shortly!*"
         return f"*ROAARRR!* 🎙️ *An unexpected disturbance in the airwaves! Let us ignite the transmission again shortly.*"
 
 @bot.event
@@ -99,7 +99,6 @@ async def on_message(message):
     # -------------------------------------------------------------
     # 🌟 GIF RECOGNITION & TRIGGER RESPONSES
     # -------------------------------------------------------------
-    # Check if the incoming message contains a GIF via link or attachment
     is_gif = "tenor.com" in content_lower or "giphy.com" in content_lower
     if not is_gif and message.attachments:
         is_gif = any(att.filename.lower().endswith('.gif') for att in message.attachments)
@@ -107,11 +106,10 @@ async def on_message(message):
     if is_gif:
         print(f"⚡ [GIF Detected] in channel {message.channel.id} by {message.author}")
 
-    # Send a specific GIF when a target phrase is parsed
     if content_lower == "let's burn" or content_lower == "!firegif":
         dragon_gif_url = "https://tenor.com/view/dragon-fire-breathe-fire-fantasy-creature-gif-17482329"
         await message.channel.send(dragon_gif_url)
-        return  # Stop execution here if you don't want the AI to reply alongside it
+        return  
     # -------------------------------------------------------------
 
     is_pinged_or_replied = bot.user.mentioned_in(message)
@@ -126,7 +124,6 @@ async def on_message(message):
         async with message.channel.typing():
             clean_message = message.content.replace(f'<@{bot.user.id}>', '').replace(f'<@!{bot.user.id}>', '').strip()
             
-            # Adjust input text if the user only uploaded a raw GIF without typing any words
             if not clean_message and is_gif: 
                 clean_message = "Look at this GIF I sent you!"
             elif not clean_message and message.attachments: 
@@ -150,3 +147,4 @@ async def on_message(message):
 
 if __name__ == "__main__":
     bot.run(DISCORD_TOKEN)
+    
