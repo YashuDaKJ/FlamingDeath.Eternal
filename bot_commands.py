@@ -1,8 +1,7 @@
 import os
-import json
 import random
 import requests
-from datetime import datetime
+import time
 from bs4 import BeautifulSoup
 
 import discord
@@ -13,20 +12,6 @@ import faction_data  # Import the secret data file
 
 SPECIAL_CHANNEL_ID = 1521899264265945109
 ADMIN_IDS = [1477528681709830297]
-MEMORY_FILE = "faction_memory.json"
-
-# --- MEMORY HELPER FUNCTIONS ---
-def load_faction_memory():
-    if not os.path.exists(MEMORY_FILE):
-        return {}
-    with open(MEMORY_FILE, 'r', encoding='utf-8') as f:
-        return json.load(f)
-
-def save_faction_memory(key, value):
-    memory = load_faction_memory()
-    memory[key.lower()] = value
-    with open(MEMORY_FILE, 'w', encoding='utf-8') as f:
-        json.dump(memory, f, indent=4)
 
 # --- WEB READER HELPER FUNCTION ---
 def fetch_web_content(url):
@@ -38,15 +23,16 @@ def fetch_web_content(url):
             
         soup = BeautifulSoup(response.text, 'html.parser')
         for script in soup(["script", "style"]): 
-            script.extract() # fixed
+            script.extract()
             
         text = soup.get_text()
         lines = (line.strip() for line in text.splitlines())
         clean_text = '\n'.join(chunk for chunk in lines if chunk)
-        return clean_text[:1500] # fixed
+        return clean_text[:1500]
     except Exception as e:
         return f"Error: {str(e)}"
 
+# --- INTERACTIVE DROP DOWN UI ---
 class HelpDropdown(discord.ui.Select):
     def __init__(self):
         options = [
@@ -61,7 +47,7 @@ class HelpDropdown(discord.ui.Select):
             embed = discord.Embed(title="🐉 General Commands", color=discord.Color.blue())
             embed.add_field(name="`/ping`", value="Check the bot's speed.", inline=False)
             embed.add_field(name="`/ask`", value="Ask FlamingDeath a question from anywhere in the server.", inline=False)
-            embed.add_field(name="`/remember`", value="Make the dragon remember faction info.", inline=False)
+            embed.add_field(name="`/remember`", value="Make the dragon remember faction info in the cloud database.", inline=False)
             embed.add_field(name="`/recall`", value="Ask the dragon to recall remembered info.", inline=False)
             embed.add_field(name="`/readweb`", value="Provide a link and let the dragon read it.", inline=False)
             embed.add_field(name="💬 Chat Mode", value=f"Talk to me directly in <#{SPECIAL_CHANNEL_ID}> without pings!", inline=False)
@@ -83,13 +69,34 @@ class HelpView(discord.ui.View):
         super().__init__()
         self.add_item(HelpDropdown())
 
+
+# ==========================================
+# MAIN COMMAND COG ARCHITECTURE
+# ==========================================
 class FactionBotCommands(commands.Cog):
-    def __init__(self, bot, conversation_history, dragon_currency, hunt_cooldowns, get_gemini_response_func):
+    def __init__(self, bot, conversation_history, get_gemini_response_func):
         self.bot = bot
         self.conversation_history = conversation_history
-        self.dragon_currency = dragon_currency
-        self.hunt_cooldowns = hunt_cooldowns
         self.get_gemini_response = get_gemini_response_func
+
+    async def _get_or_create_profile(self, user_id: int) -> dict:
+        """
+        Asynchronous database link. Fetches or initializes a member's global profile.
+        Uses the shared field 'crystals' for the FlamingDeath economy system.
+        """
+        if not self.bot.profiles:
+            return {"_id": str(user_id), "shards": 0, "crystals": 0, "last_hunt": 0}
+            
+        profile = await self.bot.profiles.find_one({"_id": str(user_id)})
+        if not profile:
+            profile = {
+                "_id": str(user_id),
+                "shards": 0,
+                "crystals": 0,
+                "last_hunt": 0
+            }
+            await self.bot.profiles.insert_one(profile)
+        return profile
 
     @app_commands.command(name='ping', description="Check the operational response latency matrix")
     async def ping(self, interaction: discord.Interaction):
@@ -103,7 +110,7 @@ class FactionBotCommands(commands.Cog):
         await interaction.response.send_message(embed=embed, view=HelpView(), ephemeral=True)
 
     @app_commands.command(name="ask", description="Ask FlamingDeath anything, anywhere!")
-    @app_commands.checks.cooldown(1, 5.0, key=lambda i: i.user.id)  # ⏱️ 5-Second Cooldown
+    @app_commands.checks.cooldown(1, 5.0, key=lambda i: i.user.id)
     async def ask(self, interaction: discord.Interaction, question: str):
         await interaction.response.defer()
         try:
@@ -125,22 +132,36 @@ class FactionBotCommands(commands.Cog):
             else:
                 await interaction.followup.send(f"🔥 *Grrr...* Error: {str(e)}")
 
+    # 🟢 UPGRADE: /remember and /recall now store custom data in a persistent 'faction_shared_memory' database collection
     @app_commands.command(name="remember", description="Make the Dragon remember a faction detail or rule")
     async def remember(self, interaction: discord.Interaction, topic: str, information: str):
-        save_faction_memory(topic, information)
-        await interaction.response.send_message(f"📥 **Memory Updated!** Maine yaad rakh liya hai ki `{topic}` kya hai.")
+        await interaction.response.defer()
+        if self.bot.db:
+            memory_coll = self.bot.db["faction_shared_memory"]
+            await memory_coll.update_one(
+                {"_id": topic.lower()},
+                {"$set": {"info": information}},
+                upsert=True
+            )
+        await interaction.followup.send(f"📥 **Memory Updated!** Maine yaad rakh liya hai ki `{topic}` kya hai.")
 
     @app_commands.command(name="recall", description="Ask the Dragon to recall something it remembered")
     async def recall(self, interaction: discord.Interaction, topic: str):
-        memory = load_faction_memory()
-        info = memory.get(topic.lower())
+        await interaction.response.defer()
+        info = None
+        if self.bot.db:
+            memory_coll = self.bot.db["faction_shared_memory"]
+            doc = await memory_coll.find_one({"_id": topic.lower()})
+            if doc:
+                info = doc.get("info")
+
         if info:
-            await interaction.response.send_message(f"🧠 **Memory Box:** `{topic}` ke baare mein mujhe ye pata hai:\n> {info}")
+            await interaction.followup.send(f"🧠 **Memory Box:** `{topic}` ke baare mein mujhe ye pata hai:\n> {info}")
         else:
-            await interaction.response.send_message(f"🔍 Sorry, mujhe `{topic}` ke baare mein kuch yaad nahi hai.")
+            await interaction.followup.send(f"🔍 Sorry, mujhe `{topic}` ke baare mein kuch yaad nahi hai.")
 
     @app_commands.command(name="readweb", description="Provide a website URL and let the Dragon read and summarize it")
-    @app_commands.checks.cooldown(1, 10.0, key=lambda i: i.user.id)  # ⏱️ 10s Cooldown for web fetching
+    @app_commands.checks.cooldown(1, 10.0, key=lambda i: i.user.id)
     async def readweb(self, interaction: discord.Interaction, url: str):
         await interaction.response.defer()
         web_raw_data = fetch_web_content(url)
@@ -189,7 +210,7 @@ class FactionBotCommands(commands.Cog):
                 await interaction.followup.send(f"🔥 Acting error: {str(e)}", ephemeral=True)
 
     @app_commands.command(name="analyze", description="Let FlamingDeath look at your photos, videos, or audio files")
-    @app_commands.checks.cooldown(1, 10.0, key=lambda i: i.user.id)  # ⏱️ 10-Second Cooldown for Media
+    @app_commands.checks.cooldown(1, 10.0, key=lambda i: i.user.id)
     async def analyze(self, interaction: discord.Interaction, prompt: str, attachment: discord.Attachment):
         await interaction.response.defer()
         if not attachment.content_type:
@@ -216,81 +237,125 @@ class FactionBotCommands(commands.Cog):
         else:
             await interaction.response.send_message(f"🔥 An execution error occurred: {str(error)}", ephemeral=True)
 
+    # ==========================================
+    # PERSISTENT ECONOMY & MINI-GAMES SYSTEMS
+    # ==========================================
+
     @app_commands.command(name="profile", description="Check your Eternal faction member card")
     async def profile(self, interaction: discord.Interaction):
+        await interaction.response.defer()
         user = interaction.user
         joined_at = user.joined_at.strftime("%Y-%m-%d") if user.joined_at else "Unknown"
-        crystals = self.dragon_currency.get(user.id, 0)
+        
+        # Read balance natively from cloud data document
+        profile = await self._get_or_create_profile(user.id)
+        crystals = profile.get("crystals", 0)
+        
         embed = discord.Embed(title=f"⚔️ Eternal Member Profile: {user.name}", color=discord.Color.blue())
         embed.set_thumbnail(url=user.display_avatar.url)
         embed.add_field(name="Faction Standing", value="**Loyal Member** 🛡️", inline=True)
         embed.add_field(name="Dragon Crystals", value=f"✨ `{crystals}` Crystals", inline=True)
         embed.add_field(name="Arrival Date", value=f"📅 {joined_at}", inline=False)
-        await interaction.response.send_message(embed=embed)
+        await interaction.followup.send(embed=embed)
 
     @app_commands.command(name="hunt", description="Go out on a dynamic dragon hunt to collect crystals!")
     async def hunt(self, interaction: discord.Interaction):
+        await interaction.response.defer()
         user_id = interaction.user.id
-        now = datetime.now()
-        if user_id in self.hunt_cooldowns:
-            diff = now - self.hunt_cooldowns[user_id]
-            if diff.total_seconds() < 3600:
-                remaining_mins = int((3600 - diff.total_seconds()) // 60)
-                await interaction.response.send_message(f"🔥 *Growls...* You are exhausted! Wait `{remaining_mins} more minutes`.", ephemeral=True)
-                return
-        self.hunt_cooldowns[user_id] = now
+        current_time = int(time.time())
+        
+        profile = await self._get_or_create_profile(user_id)
+        last_hunt = profile.get("last_hunt", 0)
+        
+        # 1-Hour Cooldown Logic = 3600 seconds
+        cooldown_duration = 3600
+        if current_time - last_hunt < cooldown_duration:
+            remaining = cooldown_duration - (current_time - last_hunt)
+            remaining_mins = int(remaining // 60)
+            await interaction.followup.send(f"🔥 *Growls...* You are exhausted! Wait `{remaining_mins} more minutes`.")
+            return
+            
         crystals_found = random.randint(15, 50)
-        self.dragon_currency[user_id] = self.dragon_currency.get(user_id, 0) + crystals_found
+        
+        if self.bot.profiles:
+            # Atomic increase to database balance and save new timestamp
+            await self.bot.profiles.update_one(
+                {"_id": str(user_id)},
+                {
+                    "$inc": {"crystals": crystals_found},
+                    "$set": {"last_hunt": current_time}
+                }
+            )
+            
         scenarios = [
             f"🐉 You flew into the sky with FlamingDeath and raided an enemy base! Found **{crystals_found}** Crystals! 🔥",
             f"⚔️ You cleared out rogue monsters threatening the boundaries of Eternal. Earned **{crystals_found}** Crystals!",
             f"💎 You discovered a hidden crystalline cave beneath the SquareOne base! Extracted **{crystals_found}** Crystals!"
         ]
-        await interaction.response.send_message(random.choice(scenarios))
+        await interaction.followup.send(random.choice(scenarios))
 
     @app_commands.command(name="coinflip", description="Bet your crystals on a coin toss!")
     @app_commands.choices(choice=[app_commands.Choice(name="Heads", value="heads"), app_commands.Choice(name="Tails", value="tails")])
     async def coinflip(self, interaction: discord.Interaction, choice: app_commands.Choice[str], bet: int):
+        await interaction.response.defer()
         user_id = interaction.user.id
-        current_balance = self.dragon_currency.get(user_id, 0)
+        
+        profile = await self._get_or_create_profile(user_id)
+        current_balance = profile.get("crystals", 0)
+        
         if bet <= 0:
-            await interaction.response.send_message("🔥 *Grrr...* You must bet at least `1 Crystal`!", ephemeral=True)
+            await interaction.followup.send("🔥 *Grrr...* You must bet at least `1 Crystal`!")
             return
         if current_balance < bet:
-            await interaction.response.send_message(f"🔥 *Growls...* You only have `{current_balance}` Crystals!", ephemeral=True)
+            await interaction.followup.send(f"🔥 *Growls...* You only have `{current_balance}` Crystals!")
             return
+            
         result = random.choice(["heads", "tails"])
         if choice.value == result:
-            self.dragon_currency[user_id] = current_balance + bet
-            await interaction.response.send_message(f"🪙 **Coinflip:** It's **{result.upper()}**! 🎉 You win **{bet}** Crystals!")
+            if self.bot.profiles:
+                await self.bot.profiles.update_one({"_id": str(user_id)}, {"$inc": {"crystals": bet}})
+            await interaction.followup.send(f"🪙 **Coinflip:** It's **{result.upper()}**! 🎉 You win **{bet}** Crystals!")
         else:
-            self.dragon_currency[user_id] = current_balance - bet
-            await interaction.response.send_message(f"🪙 **Coinflip:** It's **{result.upper()}**. 💀 You lost **{bet}** Crystals.")
+            if self.bot.profiles:
+                await self.bot.profiles.update_one({"_id": str(user_id)}, {"$inc": {"crystals": -bet}})
+            await interaction.followup.send(f"🪙 **Coinflip:** It's **{result.upper()}**. 💀 You lost **{bet}** Crystals.")
 
     @app_commands.command(name="slots", description="Play the Dragon Slot Machine! (Cost: 10 Crystals)")
     async def slots(self, interaction: discord.Interaction):
+        await interaction.response.defer()
         user_id = interaction.user.id
-        current_balance = self.dragon_currency.get(user_id, 0)
+        
+        profile = await self._get_or_create_profile(user_id)
+        current_balance = profile.get("crystals", 0)
         cost = 10
+        
         if current_balance < cost:
-            await interaction.response.send_message(f"🔥 *Coughs smoke...* You only have `{current_balance}` Crystals.", ephemeral=True)
+            await interaction.followup.send(f"🔥 *Coughs smoke...* You only have `{current_balance}` Crystals.")
             return
-        self.dragon_currency[user_id] = current_balance - cost
+            
+        # Deduct cost first
+        if self.bot.profiles:
+            await self.bot.profiles.update_one({"_id": str(user_id)}, {"$inc": {"crystals": -cost}})
+            
         items = ["🐉", "💎", "⚔️", "🔥", "🍉"]
         slot1, slot2, slot3 = random.choice(items), random.choice(items), random.choice(items)
         embed = discord.Embed(title="🎰 Eternal DRAGON SLOTS 🎰", color=discord.Color.gold())
         embed.description = f"\n> **[ {slot1} | {slot2} | {slot3} ]**\n"
+        
         if slot1 == slot2 == slot3:
-            self.dragon_currency[user_id] += 150
+            if self.bot.profiles:
+                await self.bot.profiles.update_one({"_id": str(user_id)}, {"$inc": {"crystals": 150}})
             embed.add_field(name="🎉 JACKPOT!!! 🎉", value=f"Matched! Won 150 Crystals!")
         elif slot1 == slot2 or slot2 == slot3 or slot1 == slot3:
-            self.dragon_currency[user_id] += 30
+            if self.bot.profiles:
+                await self.bot.profiles.update_one({"_id": str(user_id)}, {"$inc": {"crystals": 30}})
             embed.add_field(name="✨ Small Win! ✨", value=f"Two matched! Won 30 Crystals!")
         else:
             embed.add_field(name="💀 No Match!", value="Lost 10 Crystals.")
-        await interaction.response.send_message(embed=embed)
+        await interaction.followup.send(embed=embed)
 
-async def setup(bot, conversation_history, dragon_currency, hunt_cooldowns, get_gemini_response_func):
-    cog = FactionBotCommands(bot, conversation_history, dragon_currency, hunt_cooldowns, get_gemini_response_func)
+async def setup(bot, conversation_history, get_gemini_response_func):
+    # Adjusted footprint signatures to cleanly eliminate local parameters
+    cog = FactionBotCommands(bot, conversation_history, get_gemini_response_func)
     await bot.add_cog(cog)
-        
+            
