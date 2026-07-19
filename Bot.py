@@ -5,6 +5,7 @@ import google.generativeai as genai
 from threading import Thread
 from flask import Flask
 import requests
+import time  # ⏱️ Cooldown track karne ke liye import kiya hai
 
 # Import the separated local files
 import faction_data
@@ -36,15 +37,15 @@ SPECIAL_CHANNEL_ID = 1521899264265945109
 conversation_history = {}
 dragon_currency = {}  
 hunt_cooldowns = {}
+# ⏱️ Chat cooldown track karne ke liye ek dictionary
+chat_cooldowns = {}
 
 async def get_gemini_response(user_message: str, user_id: int, attachment_data=None) -> str:
     try:
         if user_id not in conversation_history: conversation_history[user_id] = []
         
-        # Load and merge both prompts from the separate file
         combined_instruction = f"{faction_data.SYSTEM_PROMPT}\n\nAdditional Faction Information:\n{faction_data.FACTION_PROMPT}"
         
-        # FIXED: Model changed to stable gemini-2.5-flash to eliminate 404 and quota exceptions!
         model = genai.GenerativeModel(
             model_name='gemini-2.5-flash',
             system_instruction=combined_instruction
@@ -58,11 +59,14 @@ async def get_gemini_response(user_message: str, user_id: int, attachment_data=N
         response = model.generate_content(conversation_history[user_id])
         assistant_message = response.text
         conversation_history[user_id].append({"role": "model", "parts": [assistant_message]})
-        if len(conversation_history[user_id]) > 40: conversation_history[user_id] = conversation_history[user_id][-40:]
+        
+        # 📈 OPTIMIZATION: History limit 40 se 15 kar di taaki tokens save hon!
+        if len(conversation_history[user_id]) > 15: 
+            conversation_history[user_id] = conversation_history[user_id][-15:]
+            
         return assistant_message
     except Exception as e:
         print(f"Error captured in FlamingDeath Gemini Call: {e}")
-        # SMART ERROR HANDLING: Cleaned up the repetition for a punchy dragon style message
         if "429" in str(e) or "quota" in str(e).lower():
             return "*ROAARRR!* 🎙️ *My fiery broadcast is currently choked by static! Let the flames cool down for a moment, darling, and try again shortly!*"
         return f"*ROAARRR!* 🎙️ *An unexpected disturbance in the airwaves! Let us ignite the transmission again shortly.*"
@@ -72,7 +76,6 @@ async def on_ready():
     print(f'{bot.user.name} is online!')
     await bot.change_presence(activity=discord.Activity(type=discord.ActivityType.watching, name="over Eternal"))
     
-    # Setup the separated command file
     try:
         await bot_commands.setup(bot, conversation_history, dragon_currency, hunt_cooldowns, get_gemini_response)
         synced = await bot.tree.sync()
@@ -85,20 +88,12 @@ async def on_message(message):
     if message.author.bot or message.mention_everyone: return
     await bot.process_commands(message)
     
-    # -------------------------------------------------------------
-    # 🌟 AUTOMATIC REACTION TRIGGERS
-    # -------------------------------------------------------------
     content_lower = message.content.lower()
     
-    # Simple keyword reaction example
     if "nice" in content_lower:
-        try:
-            await message.add_reaction("🔥")
+        try: await message.add_reaction("🔥")
         except: pass
 
-    # -------------------------------------------------------------
-    # 🌟 GIF RECOGNITION & TRIGGER RESPONSES
-    # -------------------------------------------------------------
     is_gif = "tenor.com" in content_lower or "giphy.com" in content_lower
     if not is_gif and message.attachments:
         is_gif = any(att.filename.lower().endswith('.gif') for att in message.attachments)
@@ -110,7 +105,6 @@ async def on_message(message):
         dragon_gif_url = "https://tenor.com/view/dragon-fire-breathe-fire-fantasy-creature-gif-17482329"
         await message.channel.send(dragon_gif_url)
         return  
-    # -------------------------------------------------------------
 
     is_pinged_or_replied = bot.user.mentioned_in(message)
     if not is_pinged_or_replied and message.reference:
@@ -121,6 +115,23 @@ async def on_message(message):
 
     name_called = "flamingdeath" in content_lower
     if (message.channel.id == SPECIAL_CHANNEL_ID) or is_pinged_or_replied or name_called:
+        
+        # ⏱️ IMPLEMENTATION: 5-Second Cooldown Check
+        current_time = time.time()
+        user_id = message.author.id
+        if user_id in chat_cooldowns:
+            elapsed = current_time - chat_cooldowns[user_id]
+            if elapsed < 5:  # 5 second se kam hua toh stop kar do
+                remaining = int(5 - elapsed)
+                try:
+                    # Chota ephemeral message jaisa reply jo 3 second baad khud delete ho jayega
+                    await message.reply(f"⏰ *Hold your flames, champion! Wait {remaining}s before broadcasting again.*", delete_after=3)
+                except: pass
+                return
+        
+        # Agar cooldown nahi laga, toh abhi ka time update karo
+        chat_cooldowns[user_id] = current_time
+
         async with message.channel.typing():
             clean_message = message.content.replace(f'<@{bot.user.id}>', '').replace(f'<@!{bot.user.id}>', '').strip()
             
