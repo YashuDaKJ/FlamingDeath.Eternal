@@ -17,7 +17,7 @@ app = Flask('')
 def home(): return "FlamingDeath is perfectly alive and burning!"
 
 def run_web_server():
-    port = int(os.getenv("PORT", 10000))
+    port = int(os.getenv("PORT", 7860))
     app.run(host='0.0.0.0', port=port)
 
 Thread(target=run_web_server, daemon=True).start()
