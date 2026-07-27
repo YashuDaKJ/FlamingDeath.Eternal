@@ -187,7 +187,9 @@ class FactionBotCommands(commands.Cog):
             file_response = requests.get(attachment.url)
             attachment_data = {'mime_type': attachment.content_type, 'data': file_response.content}
             response_text = await self.bot.get_gemini_response(prompt, interaction.user.id, attachment_data)
+            # === SAFETY: All command responses stay in server channels (no DM sending) ===
             await interaction.followup.send(f"🐉 **FlamingDeath Vision:** {response_text}")
+            # === END SAFETY ===
         except Exception as e:
             await interaction.followup.send(f"🔥 Error: {str(e)}")
 
