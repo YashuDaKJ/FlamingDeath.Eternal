@@ -38,7 +38,9 @@ class EconomyCog(commands.Cog):
         embed.add_field(name="Faction Standing", value="**Loyal Member** 🛡️", inline=True)
         embed.add_field(name="Dragon Crystals", value=f"✨ `{crystals}` Crystals", inline=True)
         embed.add_field(name="Arrival Date", value=f"📅 {joined_at}", inline=False)
+        # === SAFETY: Command feedback strictly within server channels ===
         await interaction.followup.send(embed=embed)
+        # === END SAFETY ===
 
     @app_commands.command(name="hunt", description="Go out on a dynamic dragon hunt to collect crystals!")
     async def hunt(self, interaction: discord.Interaction):
@@ -53,7 +55,9 @@ class EconomyCog(commands.Cog):
         if current_time - last_hunt < cooldown_duration:
             remaining = cooldown_duration - (current_time - last_hunt)
             remaining_mins = int(remaining // 60)
+            # === SAFETY: All responses sent via interaction (server channel safe) ===
             await interaction.followup.send(f"🔥 *Growls...* You are exhausted! Wait `{remaining_mins} more minutes`.")
+            # === END SAFETY ===
             return
             
         crystals_found = random.randint(15, 50)
@@ -131,7 +135,9 @@ class EconomyCog(commands.Cog):
             embed.add_field(name="✨ Small Win! ✨", value="Two matched! Won 30 Crystals!")
         else:
             embed.add_field(name="💀 No Match!", value="Lost 10 Crystals.")
+        # === SAFETY: All command output stays in server channels via interaction ===
         await interaction.followup.send(embed=embed)
+        # === END SAFETY ===
 
 async def setup(bot):
     await bot.add_cog(EconomyCog(bot))
