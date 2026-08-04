@@ -42,7 +42,7 @@ class HelpDropdown(discord.ui.Select):
             embed = discord.Embed(title="🐉 General Commands", color=discord.Color.blue())
             embed.add_field(name="`/ping`", value="Check the bot's speed.", inline=False)
             embed.add_field(name="`/ask`", value="Ask FlamingDeath a question.", inline=False)
-            embed.add_field(name="`/copy`", value="Echo/Copy message into a specific channel.", inline=False)
+            embed.add_field(name="`/copy`", value="Echo/Copy a message into a specific channel.", inline=False)
             embed.add_field(name="`/remember`", value="Save faction info to the database.", inline=False)
             embed.add_field(name="`/recall`", value="Recall remembered info.", inline=False)
             embed.add_field(name="`/readweb`", value="Summarize web page content.", inline=False)
@@ -114,7 +114,7 @@ class FactionBotCommands(commands.Cog):
                 {"$set": {"info": information}},
                 upsert=True
             )
-        await interaction.followup.send(f"📥 **Memory Updated!** I saved detail for `{topic}`.")
+        await interaction.followup.send(f"📥 **Memory Updated!** Saved detail for `{topic}`.")
 
     @app_commands.command(name="recall", description="Ask the Dragon to recall something it remembered")
     async def recall(self, interaction: discord.Interaction, topic: str):
@@ -157,12 +157,12 @@ class FactionBotCommands(commands.Cog):
                 await interaction.followup.send(f"🔥 Web read error: {str(e)}")
 
     # ----------------------------------------------------
-    # NEW: COPY COMMAND (Hidden response + Channel Target)
+    # NEW: COPY COMMAND (Ephemeral Confirmation + Target Channel)
     # ----------------------------------------------------
     @app_commands.command(name="copy", description="Echo/Copy any message into a target channel (Admin Only)")
     @app_commands.describe(
-        message="Jo message copy karke bhejna hai",
-        channel_name="Target channel ka naam, mention, ya ID (Optional)"
+        message="The exact text you want to echo/copy",
+        channel_name="Target channel name, mention, or ID (Optional)"
     )
     async def copy(
         self, 
@@ -174,7 +174,7 @@ class FactionBotCommands(commands.Cog):
             await interaction.response.send_message("🔥 *Growls...* Only the high keepers can command me!", ephemeral=True)
             return
 
-        # Response ko ephemeral rakha hai taaki confirmation sirf aapko dikhe
+        # Response is ephemeral so status feedback is visible ONLY to you
         await interaction.response.defer(ephemeral=True)
 
         target_channel = interaction.channel
@@ -190,7 +190,7 @@ class FactionBotCommands(commands.Cog):
                 target_channel = found_channel
             else:
                 await interaction.followup.send(
-                    f"❌ **Channel nahi mila:** `{channel_name}` naam ka koi channel nahi mila. Sahi naam ya mention use karein.", 
+                    f"❌ **Channel Not Found:** Could not find a text channel named `{channel_name}`. Please use a valid name or mention.", 
                     ephemeral=True
                 )
                 return
@@ -198,12 +198,12 @@ class FactionBotCommands(commands.Cog):
         try:
             await target_channel.send(message)
             await interaction.followup.send(
-                f"🤫 **Secret Output:** Message successfully {target_channel.mention} mein bhej diya gaya hai!", 
+                f"🤫 **Secret Output:** Message successfully dispatched to {target_channel.mention}!", 
                 ephemeral=True
             )
         except discord.Forbidden:
             await interaction.followup.send(
-                f"❌ Mujhe {target_channel.mention} mein message bhejne ki permission nahi hai.", 
+                f"❌ I lack permission to send messages in {target_channel.mention}.", 
                 ephemeral=True
             )
         except Exception as e:
@@ -238,4 +238,4 @@ class FactionBotCommands(commands.Cog):
 
 async def setup(bot):
     await bot.add_cog(FactionBotCommands(bot))
-            
+                           
