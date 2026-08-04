@@ -42,6 +42,7 @@ class HelpDropdown(discord.ui.Select):
             embed = discord.Embed(title="🐉 General Commands", color=discord.Color.blue())
             embed.add_field(name="`/ping`", value="Check the bot's speed.", inline=False)
             embed.add_field(name="`/ask`", value="Ask FlamingDeath a question.", inline=False)
+            embed.add_field(name="`/copy`", value="Echo/Copy message into a specific channel.", inline=False)
             embed.add_field(name="`/remember`", value="Save faction info to the database.", inline=False)
             embed.add_field(name="`/recall`", value="Recall remembered info.", inline=False)
             embed.add_field(name="`/readweb`", value="Summarize web page content.", inline=False)
@@ -109,7 +110,7 @@ class FactionBotCommands(commands.Cog):
         if self.bot.db:
             memory_coll = self.bot.db["faction_shared_memory"]
             await memory_coll.update_one(
-                {"_id": topic.lower()},
+                {"_id": topic.lower().strip()},
                 {"$set": {"info": information}},
                 upsert=True
             )
@@ -121,7 +122,7 @@ class FactionBotCommands(commands.Cog):
         info = None
         if self.bot.db:
             memory_coll = self.bot.db["faction_shared_memory"]
-            doc = await memory_coll.find_one({"_id": topic.lower()})
+            doc = await memory_coll.find_one({"_id": topic.lower().strip()})
             if doc:
                 info = doc.get("info")
 
@@ -155,26 +156,58 @@ class FactionBotCommands(commands.Cog):
             else:
                 await interaction.followup.send(f"🔥 Web read error: {str(e)}")
 
-    @app_commands.command(name="behave", description="Let the Dragon speak and act for you (Admin Only)")
-    async def behave(self, interaction: discord.Interaction, script: str):
+    # ----------------------------------------------------
+    # NEW: COPY COMMAND (Hidden response + Channel Target)
+    # ----------------------------------------------------
+    @app_commands.command(name="copy", description="Echo/Copy any message into a target channel (Admin Only)")
+    @app_commands.describe(
+        message="Jo message copy karke bhejna hai",
+        channel_name="Target channel ka naam, mention, ya ID (Optional)"
+    )
+    async def copy(
+        self, 
+        interaction: discord.Interaction, 
+        message: str, 
+        channel_name: str = None
+    ):
         if interaction.user.id not in ADMIN_IDS:
             await interaction.response.send_message("🔥 *Growls...* Only the high keepers can command me!", ephemeral=True)
             return
+
+        # Response ko ephemeral rakha hai taaki confirmation sirf aapko dikhe
         await interaction.response.defer(ephemeral=True)
-        try:
-            combined_instruction = f"{faction_data.SYSTEM_PROMPT}\n\nAdditional Faction Information:\n{faction_data.FACTION_PROMPT}"
-            model = genai.GenerativeModel(model_name='gemini-2.5-flash', system_instruction=combined_instruction)
-            
-            acting_prompt = f"Act completely as FlamingDeath. Directly generate the final text based on this script: {script}"
-            response = model.generate_content(acting_prompt)
-            acting_message = response.text
-            if acting_message:
-                await interaction.channel.send(acting_message)
-                await interaction.followup.send("✅ Script executed successfully!", ephemeral=True)
+
+        target_channel = interaction.channel
+
+        if channel_name:
+            clean_name = channel_name.strip("<#> ").lower()
+            found_channel = discord.utils.find(
+                lambda c: c.name.lower() == clean_name or str(c.id) == clean_name, 
+                interaction.guild.text_channels
+            )
+
+            if found_channel:
+                target_channel = found_channel
             else:
-                await interaction.followup.send("⚠️ No message was generated.", ephemeral=True)
+                await interaction.followup.send(
+                    f"❌ **Channel nahi mila:** `{channel_name}` naam ka koi channel nahi mila. Sahi naam ya mention use karein.", 
+                    ephemeral=True
+                )
+                return
+
+        try:
+            await target_channel.send(message)
+            await interaction.followup.send(
+                f"🤫 **Secret Output:** Message successfully {target_channel.mention} mein bhej diya gaya hai!", 
+                ephemeral=True
+            )
+        except discord.Forbidden:
+            await interaction.followup.send(
+                f"❌ Mujhe {target_channel.mention} mein message bhejne ki permission nahi hai.", 
+                ephemeral=True
+            )
         except Exception as e:
-            await interaction.followup.send(f"🔥 Acting error: {str(e)}", ephemeral=True)
+            await interaction.followup.send(f"❌ Copy error: {str(e)}", ephemeral=True)
 
     @app_commands.command(name="analyze", description="Let FlamingDeath look at your photos, videos, or audio files")
     @app_commands.checks.cooldown(1, 10.0, key=lambda i: i.user.id)
@@ -187,9 +220,7 @@ class FactionBotCommands(commands.Cog):
             file_response = requests.get(attachment.url)
             attachment_data = {'mime_type': attachment.content_type, 'data': file_response.content}
             response_text = await self.bot.get_gemini_response(prompt, interaction.user.id, attachment_data)
-            # === SAFETY: All command responses stay in server channels (no DM sending) ===
             await interaction.followup.send(f"🐉 **FlamingDeath Vision:** {response_text}")
-            # === END SAFETY ===
         except Exception as e:
             await interaction.followup.send(f"🔥 Error: {str(e)}")
 
@@ -207,3 +238,4 @@ class FactionBotCommands(commands.Cog):
 
 async def setup(bot):
     await bot.add_cog(FactionBotCommands(bot))
+            
