@@ -42,7 +42,7 @@ class HelpDropdown(discord.ui.Select):
             embed = discord.Embed(title="🐉 General Commands", color=discord.Color.blue())
             embed.add_field(name="`/ping`", value="Check the bot's speed.", inline=False)
             embed.add_field(name="`/ask`", value="Ask FlamingDeath a question.", inline=False)
-            embed.add_field(name="`/copy`", value="Copy/Echo a message along with files and reactions.", inline=False)
+            embed.add_field(name="`/copy`", value="Copy/Echo a message, reply, or send files.", inline=False)
             embed.add_field(name="`/remember`", value="Save faction info to the database.", inline=False)
             embed.add_field(name="`/recall`", value="Recall remembered info.", inline=False)
             embed.add_field(name="`/readweb`", value="Summarize web page content.", inline=False)
@@ -157,24 +157,28 @@ class FactionBotCommands(commands.Cog):
                 await interaction.followup.send(f"🔥 Web read error: {str(e)}")
 
     # ----------------------------------------------------
-    # UPDATED COPY COMMAND (Supports Text, Message ID, Attachments & Reactions)
+    # UPDATED COPY COMMAND (Supports Text, Message ID, Attachments, Reactions & Replies)
     # ----------------------------------------------------
-    @app_commands.command(name="copy", description="Copy a message with attachments and reactions into a target channel (Admin Only)")
+    @app_commands.command(name="copy", description="Copy a message, send text, or reply to a message anonymously (Admin Only)")
     @app_commands.describe(
-        message_input="Enter raw text to send OR a Message ID to fetch and clone",
-        target_channel="The channel where the message should be sent"
+        message_input="Enter raw text to send OR a Message ID to target",
+        reply_text="Optional text to reply directly to the target Message ID",
+        target_channel="The channel where the message should be sent (Optional)"
     )
     async def copy(
         self, 
         interaction: discord.Interaction, 
-        message_input: str, 
-        target_channel: discord.TextChannel
+        message_input: str,
+        reply_text: str = None,
+        target_channel: discord.TextChannel = None
     ):
         if interaction.user.id not in ADMIN_IDS:
             await interaction.response.send_message("🔥 *Growls...* Only the high keepers can command me!", ephemeral=True)
             return
 
         await interaction.response.defer(ephemeral=True)
+        
+        destination = target_channel or interaction.channel
 
         try:
             # Check if user passed a numeric Message ID
@@ -182,37 +186,45 @@ class FactionBotCommands(commands.Cog):
                 msg_id = int(message_input.strip())
                 original_msg = await interaction.channel.fetch_message(msg_id)
                 
-                # Download attachments into memory
-                files = []
-                for attachment in original_msg.attachments:
-                    files.append(await attachment.to_file())
-                
-                # Send text and attachments to target channel
-                new_msg = await target_channel.send(content=original_msg.content, files=files)
-                
-                # Clone reactions
-                for reaction in original_msg.reactions:
-                    try:
-                        await new_msg.add_reaction(reaction.emoji)
-                    except discord.HTTPException:
-                        pass
-                
-                await interaction.followup.send(
-                    f"🤫 **Secret Output:** Cloned message `{msg_id}` (including attachments and reactions) to {target_channel.mention}!", 
-                    ephemeral=True
-                )
+                if reply_text:
+                    # Reply directly to the original message
+                    await original_msg.reply(reply_text)
+                    await interaction.followup.send(
+                        f"🤫 **Secret Output:** Replied to message `{msg_id}` in {interaction.channel.mention}!", 
+                        ephemeral=True
+                    )
+                else:
+                    # Download attachments into memory
+                    files = []
+                    for attachment in original_msg.attachments:
+                        files.append(await attachment.to_file())
+                    
+                    # Send text and attachments to target channel
+                    new_msg = await destination.send(content=original_msg.content, files=files)
+                    
+                    # Clone reactions
+                    for reaction in original_msg.reactions:
+                        try:
+                            await new_msg.add_reaction(reaction.emoji)
+                        except discord.HTTPException:
+                            pass
+                    
+                    await interaction.followup.send(
+                        f"🤫 **Secret Output:** Cloned message `{msg_id}` (including attachments and reactions) to {destination.mention}!", 
+                        ephemeral=True
+                    )
             else:
                 # Treat message_input as standard raw text string
-                await target_channel.send(content=message_input)
+                await destination.send(content=message_input)
                 await interaction.followup.send(
-                    f"🤫 **Secret Output:** Dispatched text directly to {target_channel.mention}!", 
+                    f"🤫 **Secret Output:** Dispatched text directly to {destination.mention}!", 
                     ephemeral=True
                 )
 
         except discord.NotFound:
             await interaction.followup.send(f"❌ Could not find message ID `{message_input}` in this channel.", ephemeral=True)
         except discord.Forbidden:
-            await interaction.followup.send(f"❌ I lack permission to send messages or add reactions in {target_channel.mention}.", ephemeral=True)
+            await interaction.followup.send(f"❌ I lack permission to send messages or add reactions in {destination.mention}.", ephemeral=True)
         except Exception as e:
             await interaction.followup.send(f"❌ Copy execution error: {str(e)}", ephemeral=True)
 
