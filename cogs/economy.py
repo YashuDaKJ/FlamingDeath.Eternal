@@ -5,7 +5,7 @@ from discord import app_commands
 from discord.ext import commands
 
 # ==========================================
-# 🌟 INTERACTIVE EXPEDITION UI (NEW GAME)
+# 🌟 INTERACTIVE EXPEDITION UI
 # ==========================================
 class ExpeditionView(discord.ui.View):
     def __init__(self, user_id: int, bot):
@@ -15,13 +15,11 @@ class ExpeditionView(discord.ui.View):
         self.chosen = False
 
     async def handle_choice(self, interaction: discord.Interaction, choice_type: str):
-        # Prevent other users from clicking the buttons
         if interaction.user.id != self.user_id:
             await interaction.response.send_message("❌ This is not your expedition! Start your own with `/expedition`.", ephemeral=True)
             return
 
         self.chosen = True
-        # Disable all buttons after a choice is made
         for child in self.children:
             child.disabled = True
 
@@ -47,7 +45,6 @@ class ExpeditionView(discord.ui.View):
         scenario = random.choice(events[choice_type])
         reward = scenario["crystals"]
         
-        # Add crystals to the database if the player won
         if reward > 0 and self.bot.profiles:
             await self.bot.profiles.update_one(
                 {"_id": str(interaction.user.id)},
@@ -68,7 +65,6 @@ class ExpeditionView(discord.ui.View):
 
         await interaction.response.edit_message(embed=embed, view=self)
 
-    # --- BUTTON DEFINITIONS ---
     @discord.ui.button(label="Deep Caverns", style=discord.ButtonStyle.primary, emoji="⛏️")
     async def btn_caverns(self, interaction: discord.Interaction, button: discord.ui.Button):
         await self.handle_choice(interaction, "caverns")
@@ -83,14 +79,13 @@ class ExpeditionView(discord.ui.View):
 
 
 # ==========================================
-# MAIN ECONOMY COG (YOUR EXISTING CODE)
+# MAIN ECONOMY COG
 # ==========================================
 class EconomyCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
     async def _get_or_create_profile(self, user_id: int) -> dict:
-        """Fetches or initializes user profile in MongoDB."""
         if not self.bot.profiles:
             return {"_id": str(user_id), "shards": 0, "crystals": 0, "last_hunt": 0, "last_expedition": 0}
             
@@ -120,13 +115,8 @@ class EconomyCog(commands.Cog):
         embed.add_field(name="Faction Standing", value="**Loyal Member** 🛡️", inline=True)
         embed.add_field(name="Dragon Crystals", value=f"✨ `{crystals}` Crystals", inline=True)
         embed.add_field(name="Arrival Date", value=f"📅 {joined_at}", inline=False)
-        # === SAFETY: Command feedback strictly within server channels ===
         await interaction.followup.send(embed=embed)
-        # === END SAFETY ===
 
-    # ==========================================
-    # 🌟 NEW EXPEDITION COMMAND
-    # ==========================================
     @app_commands.command(name="expedition", description="Embark on an interactive journey to find Crystals!")
     async def expedition(self, interaction: discord.Interaction):
         await interaction.response.defer()
@@ -136,15 +126,14 @@ class EconomyCog(commands.Cog):
         profile = await self._get_or_create_profile(user_id)
         last_expedition = profile.get("last_expedition", 0)
         
-        # 2 Hour Cooldown for Expedition (Bigger rewards than hunt, so longer cooldown)
-        cooldown_duration = 7200 
+        # Changed to 1 Hour Cooldown (3600 seconds)
+        cooldown_duration = 3600 
         if current_time - last_expedition < cooldown_duration:
             remaining = cooldown_duration - (current_time - last_expedition)
             remaining_mins = int(remaining // 60)
             await interaction.followup.send(f"⛺ You are resting from your last journey. You can launch the next expedition in `{remaining_mins} minutes`.")
             return
 
-        # Update cooldown timestamp in DB
         if self.bot.profiles:
             await self.bot.profiles.update_one(
                 {"_id": str(user_id)},
@@ -168,6 +157,65 @@ class EconomyCog(commands.Cog):
         view = ExpeditionView(interaction.user.id, self.bot)
         await interaction.followup.send(embed=embed, view=view)
 
+    # ==========================================
+    # 🛡️ ADMIN REWARD COMMANDS
+    # ==========================================
+    @app_commands.command(name="give_everyone", description="Give Dragon Crystals to all server members (Admin Only)")
+    @app_commands.describe(amount="Amount of crystals to give to everyone")
+    async def give_everyone(self, interaction: discord.Interaction, amount: int):
+        if not interaction.user.guild_permissions.administrator:
+            await interaction.response.send_message("❌ Only server admins can use this command!", ephemeral=True)
+            return
+
+        if amount <= 0:
+            await interaction.response.send_message("❌ Amount must be greater than 0!", ephemeral=True)
+            return
+
+        await interaction.response.defer()
+
+        if self.bot.profiles:
+            await self.bot.profiles.update_many(
+                {},
+                {"$inc": {"crystals": amount}},
+                upsert=True
+            )
+
+        embed = discord.Embed(
+            title="🎉 FACTION TREASURY BONUS! 🎉",
+            description=f"**@everyone** has been awarded **✨ {amount} Dragon Crystals** by {interaction.user.mention}!",
+            color=discord.Color.gold()
+        )
+        await interaction.followup.send(content="@everyone", embed=embed)
+
+    @app_commands.command(name="give_role", description="Give Dragon Crystals to members with a specific role (Admin Only)")
+    @app_commands.describe(role="The role to receive crystals", amount="Amount of crystals")
+    async def give_role(self, interaction: discord.Interaction, role: discord.Role, amount: int):
+        if not interaction.user.guild_permissions.administrator:
+            await interaction.response.send_message("❌ Only server admins can use this command!", ephemeral=True)
+            return
+
+        if amount <= 0:
+            await interaction.response.send_message("❌ Amount must be greater than 0!", ephemeral=True)
+            return
+
+        await interaction.response.defer()
+
+        count = 0
+        for member in role.members:
+            if not member.bot and self.bot.profiles:
+                await self.bot.profiles.update_one(
+                    {"_id": str(member.id)},
+                    {"$inc": {"crystals": amount}},
+                    upsert=True
+                )
+                count += 1
+
+        embed = discord.Embed(
+            title="🎁 ROLE REWARD DISTRIBUTED",
+            description=f"Gave **✨ {amount} Crystals** to **{count} members** with the {role.mention} role!",
+            color=discord.Color.green()
+        )
+        await interaction.followup.send(embed=embed)
 
     # ==========================================
     # ORIGINAL COMMANDS (UNCHANGED)
@@ -185,9 +233,7 @@ class EconomyCog(commands.Cog):
         if current_time - last_hunt < cooldown_duration:
             remaining = cooldown_duration - (current_time - last_hunt)
             remaining_mins = int(remaining // 60)
-            # === SAFETY: All responses sent via interaction (server channel safe) ===
             await interaction.followup.send(f"🔥 *Growls...* You are exhausted! Wait `{remaining_mins} more minutes`.")
-            # === END SAFETY ===
             return
             
         crystals_found = random.randint(15, 50)
@@ -265,10 +311,8 @@ class EconomyCog(commands.Cog):
             embed.add_field(name="✨ Small Win! ✨", value="Two matched! Won 30 Crystals!")
         else:
             embed.add_field(name="💀 No Match!", value="Lost 10 Crystals.")
-        # === SAFETY: All command output stays in server channels via interaction ===
         await interaction.followup.send(embed=embed)
-        # === END SAFETY ===
 
 async def setup(bot):
     await bot.add_cog(EconomyCog(bot))
-                 
+        
