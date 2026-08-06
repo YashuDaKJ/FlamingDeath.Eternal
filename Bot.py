@@ -1,6 +1,7 @@
 import os
 import time
 import asyncio
+import certifi
 from threading import Thread
 from flask import Flask
 
@@ -54,7 +55,11 @@ class FlamingDeathBot(commands.Bot):
             self.db = None
             self.profiles = None
         else:
-            self.db_client = motor.motor_asyncio.AsyncIOMotorClient(MONGO_URI)
+            # Added tlsCAFile to prevent SSL handshake issues on Linux deployment containers
+            self.db_client = motor.motor_asyncio.AsyncIOMotorClient(
+                MONGO_URI, 
+                tlsCAFile=certifi.where()
+            )
             self.db = self.db_client["eternal_faction_db"]
             self.profiles = self.db["user_profiles"]
             print("🔥 MongoDB Atlas Pipeline: FlamingDeath connected successfully!")
@@ -85,7 +90,6 @@ class FlamingDeathBot(commands.Bot):
             )
             
             if attachment_data:
-                # Run synchronous Gemini call in a background thread to prevent blocking asyncio loop
                 response = await asyncio.to_thread(
                     model.generate_content, [user_message, attachment_data]
                 )
@@ -96,7 +100,6 @@ class FlamingDeathBot(commands.Bot):
             if len(self.conversation_history[user_id]) > 15:
                 self.conversation_history[user_id] = self.conversation_history[user_id][-15:]
                 
-            # Run synchronous Gemini call in background thread
             response = await asyncio.to_thread(
                 model.generate_content, self.conversation_history[user_id]
             )
@@ -180,7 +183,6 @@ async def on_message(message):
                     try:
                         file_attachment = message.attachments[0]
                         if file_attachment.content_type:
-                            # Asynchronous download using aiohttp (Non-blocking)
                             async with bot.session.get(file_attachment.url) as resp:
                                 if resp.status == 200:
                                     file_bytes = await resp.read()
@@ -201,4 +203,4 @@ async def on_message(message):
 
 if __name__ == "__main__":
     bot.run(DISCORD_TOKEN)
-                                  
+    
