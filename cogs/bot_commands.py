@@ -50,7 +50,7 @@ class HelpDropdown(discord.ui.Select):
             embed.add_field(name="💬 Chat Mode", value=f"Talk directly in <#{SPECIAL_CHANNEL_ID}> without pings!", inline=False)
             await interaction.response.edit_message(embed=embed)
         elif self.values[0] == "AI Multimedia":
-            embed = discord.Embed(title="🎨 AI Multimedia Commands", color=discord.Color.cyan())
+            embed = discord.Embed(title="🎨 AI Multimedia Commands", color=discord.Color.teal())
             embed.add_field(name="`/analyze`", value="Upload an image, video, or audio file for Dragon Vision!", inline=False)
             await interaction.response.edit_message(embed=embed)
         elif self.values[0] == "Faction Games & RPG":
@@ -77,7 +77,11 @@ class FactionBotCommands(commands.Cog):
 
     @app_commands.command(name="help", description="Show all available features of FlamingDeath")
     async def help_command(self, interaction: discord.Interaction):
-        embed = discord.Embed(title="🔥 FlamingDeath Command Center 🔥", description="Welcome, Eternal member! Select a category from the menu below.", color=discord.Color.cyan())
+        embed = discord.Embed(
+            title="🔥 FlamingDeath Command Center 🔥", 
+            description="Welcome, Eternal member! Select a category from the menu below.", 
+            color=discord.Color.teal()
+        )
         embed.set_footer(text="Guarding Eternal since 2025")
         await interaction.response.send_message(embed=embed, view=HelpView(), ephemeral=True)
 
@@ -274,4 +278,4 @@ class FactionBotCommands(commands.Cog):
 
 async def setup(bot):
     await bot.add_cog(FactionBotCommands(bot))
-        
+    
