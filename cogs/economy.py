@@ -121,6 +121,50 @@ class EconomyCog(commands.Cog):
         embed.add_field(name="Arrival Date", value=f"📅 {joined_at}", inline=False)
         await interaction.followup.send(embed=embed)
 
+    @app_commands.command(name="leaderboard", description="View the top dragon crystal hoarders in ETERNAL!")
+    async def leaderboard(self, interaction: discord.Interaction):
+        await interaction.response.defer()
+
+        if self.bot.profiles is None:
+            await interaction.followup.send("❌ Database connection is currently unavailable.", ephemeral=True)
+            return
+
+        try:
+            # Query top 10 profiles sorted by Dragon Crystals descending
+            cursor = self.bot.profiles.find().sort("crystals", -1).limit(10)
+            top_users = await cursor.to_list(length=10)
+
+            if not top_users:
+                await interaction.followup.send("📜 *No crystal hoarders found in the faction database yet!*")
+                return
+
+            embed = discord.Embed(
+                title="🏆 ETERNAL Faction Leaderboard — Top Crystal Hoarders",
+                color=discord.Color.gold()
+            )
+
+            medals = ["🥇", "🥈", "🥉"]
+            leaderboard_text = ""
+
+            for index, user_data in enumerate(top_users, start=1):
+                user_id = user_data.get("_id")
+                rank_str = medals[index - 1] if index <= 3 else f"`#{index}`"
+                crystals = user_data.get("crystals", 0)
+
+                leaderboard_text += f"{rank_str} <@{user_id}> — ✨ **{crystals:,}** Crystals\n"
+
+            embed.description = leaderboard_text
+            embed.set_footer(
+                text=f"Requested by {interaction.user.display_name}", 
+                icon_url=interaction.user.display_avatar.url
+            )
+
+            await interaction.followup.send(embed=embed)
+
+        except Exception as e:
+            print(f"Error fetching leaderboard: {e}")
+            await interaction.followup.send("❌ *An error occurred while loading the leaderboard ranks.*", ephemeral=True)
+
     @app_commands.command(name="expedition", description="Embark on an interactive journey to find Crystals!")
     async def expedition(self, interaction: discord.Interaction):
         await interaction.response.defer()
@@ -245,7 +289,8 @@ class EconomyCog(commands.Cog):
                 {
                     "$inc": {"crystals": crystals_found},
                     "$set": {"last_hunt": current_time}
-                }
+                },
+                upsert=True
             )
             
         scenarios = [
@@ -274,11 +319,11 @@ class EconomyCog(commands.Cog):
         result = random.choice(["heads", "tails"])
         if choice.value == result:
             if self.bot.profiles is not None:
-                await self.bot.profiles.update_one({"_id": str(user_id)}, {"$inc": {"crystals": bet}})
+                await self.bot.profiles.update_one({"_id": str(user_id)}, {"$inc": {"crystals": bet}}, upsert=True)
             await interaction.followup.send(f"🪙 **Coinflip:** It's **{result.upper()}**! 🎉 You win **{bet}** Crystals!")
         else:
             if self.bot.profiles is not None:
-                await self.bot.profiles.update_one({"_id": str(user_id)}, {"$inc": {"crystals": -bet}})
+                await self.bot.profiles.update_one({"_id": str(user_id)}, {"$inc": {"crystals": -bet}}, upsert=True)
             await interaction.followup.send(f"🪙 **Coinflip:** It's **{result.upper()}**. 💀 You lost **{bet}** Crystals.")
 
     @app_commands.command(name="slots", description="Play the Dragon Slot Machine! (Cost: 10 Crystals)")
@@ -295,7 +340,7 @@ class EconomyCog(commands.Cog):
             return
             
         if self.bot.profiles is not None:
-            await self.bot.profiles.update_one({"_id": str(user_id)}, {"$inc": {"crystals": -cost}})
+            await self.bot.profiles.update_one({"_id": str(user_id)}, {"$inc": {"crystals": -cost}}, upsert=True)
             
         items = ["🐉", "💎", "⚔️", "🔥", "🍉"]
         slot1, slot2, slot3 = random.choice(items), random.choice(items), random.choice(items)
@@ -304,11 +349,11 @@ class EconomyCog(commands.Cog):
         
         if slot1 == slot2 == slot3:
             if self.bot.profiles is not None:
-                await self.bot.profiles.update_one({"_id": str(user_id)}, {"$inc": {"crystals": 150}})
+                await self.bot.profiles.update_one({"_id": str(user_id)}, {"$inc": {"crystals": 150}}, upsert=True)
             embed.add_field(name="🎉 JACKPOT!!! 🎉", value="Matched! Won 150 Crystals!")
         elif slot1 == slot2 or slot2 == slot3 or slot1 == slot3:
             if self.bot.profiles is not None:
-                await self.bot.profiles.update_one({"_id": str(user_id)}, {"$inc": {"crystals": 30}})
+                await self.bot.profiles.update_one({"_id": str(user_id)}, {"$inc": {"crystals": 30}}, upsert=True)
             embed.add_field(name="✨ Small Win! ✨", value="Two matched! Won 30 Crystals!")
         else:
             embed.add_field(name="💀 No Match!", value="Lost 10 Crystals.")
@@ -316,4 +361,4 @@ class EconomyCog(commands.Cog):
 
 async def setup(bot):
     await bot.add_cog(EconomyCog(bot))
-                 
+                             
