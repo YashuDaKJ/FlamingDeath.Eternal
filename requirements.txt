@@ -9,3 +9,4 @@ pillow
 orjson
 pymongo[srv]
 motor
+certifi
