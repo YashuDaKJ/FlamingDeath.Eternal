@@ -1,6 +1,6 @@
 import os
 import time
-import requests
+import asyncio
 from threading import Thread
 from flask import Flask
 
@@ -8,6 +8,7 @@ import discord
 from discord.ext import commands
 import google.generativeai as genai
 import motor.motor_asyncio
+import aiohttp
 
 import faction_data
 
@@ -45,6 +46,7 @@ class FlamingDeathBot(commands.Bot):
         
         self.conversation_history = {}
         self.chat_cooldowns = {}
+        self.session = None  # Non-blocking HTTP session for downloading media
         
         if not MONGO_URI:
             print("⚠️ WARNING: MONGO_URI missing! Database features will fail.")
@@ -58,11 +60,18 @@ class FlamingDeathBot(commands.Bot):
             print("🔥 MongoDB Atlas Pipeline: FlamingDeath connected successfully!")
 
     async def setup_hook(self):
-        """Load all cogs dynamically before login."""
+        """Load all cogs dynamically and initialize aiohttp session before login."""
+        self.session = aiohttp.ClientSession()
         await self.load_extension("cogs.bot_commands")
         await self.load_extension("cogs.economy")
         await self.load_extension("cogs.reaction")
         print("⚙️ All cogs loaded successfully.")
+
+    async def close(self):
+        """Clean up HTTP session when bot shuts down."""
+        if self.session:
+            await self.session.close()
+        await super().close()
 
     async def get_gemini_response(self, user_message: str, user_id: int, attachment_data=None) -> str:
         try:
@@ -76,7 +85,10 @@ class FlamingDeathBot(commands.Bot):
             )
             
             if attachment_data:
-                response = model.generate_content([user_message, attachment_data])
+                # Run synchronous Gemini call in a background thread to prevent blocking asyncio loop
+                response = await asyncio.to_thread(
+                    model.generate_content, [user_message, attachment_data]
+                )
                 return response.text
                 
             self.conversation_history[user_id].append({"role": "user", "parts": [user_message]})
@@ -84,7 +96,10 @@ class FlamingDeathBot(commands.Bot):
             if len(self.conversation_history[user_id]) > 15:
                 self.conversation_history[user_id] = self.conversation_history[user_id][-15:]
                 
-            response = model.generate_content(self.conversation_history[user_id])
+            # Run synchronous Gemini call in background thread
+            response = await asyncio.to_thread(
+                model.generate_content, self.conversation_history[user_id]
+            )
             assistant_message = response.text
             self.conversation_history[user_id].append({"role": "model", "parts": [assistant_message]})
             return assistant_message
@@ -161,14 +176,21 @@ async def on_message(message):
                 
             if clean_message:
                 attachment_data = None
-                if message.attachments:
+                if message.attachments and bot.session:
                     try:
                         file_attachment = message.attachments[0]
                         if file_attachment.content_type:
-                            file_response = requests.get(file_attachment.url)
-                            attachment_data = {'mime_type': file_attachment.content_type, 'data': file_response.content}
-                    except Exception:
-                        pass
+                            # Asynchronous download using aiohttp (Non-blocking)
+                            async with bot.session.get(file_attachment.url) as resp:
+                                if resp.status == 200:
+                                    file_bytes = await resp.read()
+                                    attachment_data = {
+                                        'mime_type': file_attachment.content_type, 
+                                        'data': file_bytes
+                                    }
+                    except Exception as e:
+                        print(f"Attachment download failed: {e}")
+
                 response = await bot.get_gemini_response(clean_message, message.author.id, attachment_data)
                 if len(response) > 2000:
                     chunks = [response[i:i+1900] for i in range(0, len(response), 1900)]
@@ -179,4 +201,4 @@ async def on_message(message):
 
 if __name__ == "__main__":
     bot.run(DISCORD_TOKEN)
-    
+                                  
