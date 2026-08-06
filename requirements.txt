@@ -4,10 +4,8 @@ python-dotenv==1.0.0
 flask
 beautifulsoup4
 requests
+aiohttp
 pillow
 orjson
-uvloop
-aiodns
-faust-cchardet
 pymongo[srv]
 motor
