@@ -9,7 +9,7 @@ from discord.ext import commands
 # ==========================================
 class ExpeditionView(discord.ui.View):
     def __init__(self, user_id: int, bot):
-        super().__init__(timeout=30.0) # Player has 30 seconds to choose
+        super().__init__(timeout=30.0)  # Player has 30 seconds to choose
         self.user_id = user_id
         self.bot = bot
         self.chosen = False
@@ -19,11 +19,15 @@ class ExpeditionView(discord.ui.View):
             await interaction.response.send_message("❌ This is not your expedition! Start your own with `/expedition`.", ephemeral=True)
             return
 
+        if self.chosen:
+            return
+
         self.chosen = True
+        
+        # Disable all buttons upon selection
         for child in self.children:
             child.disabled = True
 
-        # Custom Lore for ETERNAL Faction
         events = {
             "caverns": [
                 {"text": "⛏️ You mined deep into an abandoned mineshaft and discovered rare crystals!", "crystals": random.randint(40, 80), "color": discord.Color.blue()},
@@ -157,15 +161,13 @@ class EconomyCog(commands.Cog):
         await interaction.followup.send(embed=embed, view=view)
 
     # ==========================================
-    # 🛡️ ADMIN REWARD COMMANDS (FIXED TIMEOUTS)
+    # 🛡️ ADMIN REWARD COMMANDS
     # ==========================================
     @app_commands.command(name="give_everyone", description="Give Dragon Crystals to all server members (Admin Only)")
     @app_commands.describe(amount="Amount of crystals to give to everyone")
     async def give_everyone(self, interaction: discord.Interaction, amount: int):
-        # 1. ALWAYS defer first to avoid the 3-second timeout!
         await interaction.response.defer()
 
-        # 2. Check permissions after deferring, using followup.send
         if not interaction.user.guild_permissions.administrator:
             await interaction.followup.send("❌ Only server admins can use this command!", ephemeral=True)
             return
@@ -191,10 +193,8 @@ class EconomyCog(commands.Cog):
     @app_commands.command(name="give_role", description="Give Dragon Crystals to members with a specific role (Admin Only)")
     @app_commands.describe(role="The role to receive crystals", amount="Amount of crystals")
     async def give_role(self, interaction: discord.Interaction, role: discord.Role, amount: int):
-        # 1. ALWAYS defer first to avoid the 3-second timeout!
         await interaction.response.defer()
 
-        # 2. Check permissions after deferring
         if not interaction.user.guild_permissions.administrator:
             await interaction.followup.send("❌ Only server admins can use this command!", ephemeral=True)
             return
@@ -203,25 +203,23 @@ class EconomyCog(commands.Cog):
             await interaction.followup.send("❌ Amount must be greater than 0!", ephemeral=True)
             return
 
-        count = 0
-        for member in role.members:
-            if not member.bot and self.bot.profiles:
-                await self.bot.profiles.update_one(
-                    {"_id": str(member.id)},
-                    {"$inc": {"crystals": amount}},
-                    upsert=True
-                )
-                count += 1
+        member_ids = [str(m.id) for m in role.members if not m.bot]
+        if member_ids and self.bot.profiles:
+            await self.bot.profiles.update_many(
+                {"_id": {"$in": member_ids}},
+                {"$inc": {"crystals": amount}},
+                upsert=True
+            )
 
         embed = discord.Embed(
             title="🎁 ROLE REWARD DISTRIBUTED",
-            description=f"Gave **✨ {amount} Crystals** to **{count} members** with the {role.mention} role!",
+            description=f"Gave **✨ {amount} Crystals** to **{len(member_ids)} members** with the {role.mention} role!",
             color=discord.Color.green()
         )
         await interaction.followup.send(embed=embed)
 
     # ==========================================
-    # ORIGINAL COMMANDS (UNCHANGED)
+    # FACTION MINI-GAMES
     # ==========================================
     @app_commands.command(name="hunt", description="Go out on a dynamic dragon hunt to collect crystals!")
     async def hunt(self, interaction: discord.Interaction):
