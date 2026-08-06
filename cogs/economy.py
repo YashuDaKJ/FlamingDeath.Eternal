@@ -126,7 +126,6 @@ class EconomyCog(commands.Cog):
         profile = await self._get_or_create_profile(user_id)
         last_expedition = profile.get("last_expedition", 0)
         
-        # Changed to 1 Hour Cooldown (3600 seconds)
         cooldown_duration = 3600 
         if current_time - last_expedition < cooldown_duration:
             remaining = cooldown_duration - (current_time - last_expedition)
@@ -158,20 +157,22 @@ class EconomyCog(commands.Cog):
         await interaction.followup.send(embed=embed, view=view)
 
     # ==========================================
-    # 🛡️ ADMIN REWARD COMMANDS
+    # 🛡️ ADMIN REWARD COMMANDS (FIXED TIMEOUTS)
     # ==========================================
     @app_commands.command(name="give_everyone", description="Give Dragon Crystals to all server members (Admin Only)")
     @app_commands.describe(amount="Amount of crystals to give to everyone")
     async def give_everyone(self, interaction: discord.Interaction, amount: int):
+        # 1. ALWAYS defer first to avoid the 3-second timeout!
+        await interaction.response.defer()
+
+        # 2. Check permissions after deferring, using followup.send
         if not interaction.user.guild_permissions.administrator:
-            await interaction.response.send_message("❌ Only server admins can use this command!", ephemeral=True)
+            await interaction.followup.send("❌ Only server admins can use this command!", ephemeral=True)
             return
 
         if amount <= 0:
-            await interaction.response.send_message("❌ Amount must be greater than 0!", ephemeral=True)
+            await interaction.followup.send("❌ Amount must be greater than 0!", ephemeral=True)
             return
-
-        await interaction.response.defer()
 
         if self.bot.profiles:
             await self.bot.profiles.update_many(
@@ -190,15 +191,17 @@ class EconomyCog(commands.Cog):
     @app_commands.command(name="give_role", description="Give Dragon Crystals to members with a specific role (Admin Only)")
     @app_commands.describe(role="The role to receive crystals", amount="Amount of crystals")
     async def give_role(self, interaction: discord.Interaction, role: discord.Role, amount: int):
+        # 1. ALWAYS defer first to avoid the 3-second timeout!
+        await interaction.response.defer()
+
+        # 2. Check permissions after deferring
         if not interaction.user.guild_permissions.administrator:
-            await interaction.response.send_message("❌ Only server admins can use this command!", ephemeral=True)
+            await interaction.followup.send("❌ Only server admins can use this command!", ephemeral=True)
             return
 
         if amount <= 0:
-            await interaction.response.send_message("❌ Amount must be greater than 0!", ephemeral=True)
+            await interaction.followup.send("❌ Amount must be greater than 0!", ephemeral=True)
             return
-
-        await interaction.response.defer()
 
         count = 0
         for member in role.members:
