@@ -49,7 +49,7 @@ class ExpeditionView(discord.ui.View):
         scenario = random.choice(events[choice_type])
         reward = scenario["crystals"]
         
-        if reward > 0 and self.bot.profiles:
+        if reward > 0 and self.bot.profiles is not None:
             await self.bot.profiles.update_one(
                 {"_id": str(interaction.user.id)},
                 {"$inc": {"crystals": reward}},
@@ -90,7 +90,7 @@ class EconomyCog(commands.Cog):
         self.bot = bot
 
     async def _get_or_create_profile(self, user_id: int) -> dict:
-        if not self.bot.profiles:
+        if self.bot.profiles is None:
             return {"_id": str(user_id), "shards": 0, "crystals": 0, "last_hunt": 0, "last_expedition": 0}
             
         profile = await self.bot.profiles.find_one({"_id": str(user_id)})
@@ -137,7 +137,7 @@ class EconomyCog(commands.Cog):
             await interaction.followup.send(f"⛺ You are resting from your last journey. You can launch the next expedition in `{remaining_mins} minutes`.")
             return
 
-        if self.bot.profiles:
+        if self.bot.profiles is not None:
             await self.bot.profiles.update_one(
                 {"_id": str(user_id)},
                 {"$set": {"last_expedition": current_time}},
@@ -176,7 +176,7 @@ class EconomyCog(commands.Cog):
             await interaction.followup.send("❌ Amount must be greater than 0!", ephemeral=True)
             return
 
-        if self.bot.profiles:
+        if self.bot.profiles is not None:
             await self.bot.profiles.update_many(
                 {},
                 {"$inc": {"crystals": amount}},
@@ -204,7 +204,7 @@ class EconomyCog(commands.Cog):
             return
 
         member_ids = [str(m.id) for m in role.members if not m.bot]
-        if member_ids and self.bot.profiles:
+        if member_ids and self.bot.profiles is not None:
             await self.bot.profiles.update_many(
                 {"_id": {"$in": member_ids}},
                 {"$inc": {"crystals": amount}},
@@ -239,7 +239,7 @@ class EconomyCog(commands.Cog):
             
         crystals_found = random.randint(15, 50)
         
-        if self.bot.profiles:
+        if self.bot.profiles is not None:
             await self.bot.profiles.update_one(
                 {"_id": str(user_id)},
                 {
@@ -273,11 +273,11 @@ class EconomyCog(commands.Cog):
             
         result = random.choice(["heads", "tails"])
         if choice.value == result:
-            if self.bot.profiles:
+            if self.bot.profiles is not None:
                 await self.bot.profiles.update_one({"_id": str(user_id)}, {"$inc": {"crystals": bet}})
             await interaction.followup.send(f"🪙 **Coinflip:** It's **{result.upper()}**! 🎉 You win **{bet}** Crystals!")
         else:
-            if self.bot.profiles:
+            if self.bot.profiles is not None:
                 await self.bot.profiles.update_one({"_id": str(user_id)}, {"$inc": {"crystals": -bet}})
             await interaction.followup.send(f"🪙 **Coinflip:** It's **{result.upper()}**. 💀 You lost **{bet}** Crystals.")
 
@@ -294,7 +294,7 @@ class EconomyCog(commands.Cog):
             await interaction.followup.send(f"🔥 You only have `{current_balance}` Crystals.")
             return
             
-        if self.bot.profiles:
+        if self.bot.profiles is not None:
             await self.bot.profiles.update_one({"_id": str(user_id)}, {"$inc": {"crystals": -cost}})
             
         items = ["🐉", "💎", "⚔️", "🔥", "🍉"]
@@ -303,11 +303,11 @@ class EconomyCog(commands.Cog):
         embed.description = f"\n> **[ {slot1} | {slot2} | {slot3} ]**\n"
         
         if slot1 == slot2 == slot3:
-            if self.bot.profiles:
+            if self.bot.profiles is not None:
                 await self.bot.profiles.update_one({"_id": str(user_id)}, {"$inc": {"crystals": 150}})
             embed.add_field(name="🎉 JACKPOT!!! 🎉", value="Matched! Won 150 Crystals!")
         elif slot1 == slot2 or slot2 == slot3 or slot1 == slot3:
-            if self.bot.profiles:
+            if self.bot.profiles is not None:
                 await self.bot.profiles.update_one({"_id": str(user_id)}, {"$inc": {"crystals": 30}})
             embed.add_field(name="✨ Small Win! ✨", value="Two matched! Won 30 Crystals!")
         else:
@@ -316,4 +316,4 @@ class EconomyCog(commands.Cog):
 
 async def setup(bot):
     await bot.add_cog(EconomyCog(bot))
-        
+                 
