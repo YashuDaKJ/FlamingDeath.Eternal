@@ -1,3 +1,4 @@
+import asyncio
 import requests
 from bs4 import BeautifulSoup
 
@@ -88,7 +89,8 @@ class FactionBotCommands(commands.Cog):
             combined_instruction = f"{faction_data.SYSTEM_PROMPT}\n\nAdditional Faction Information:\n{faction_data.FACTION_PROMPT}"
             model = genai.GenerativeModel(model_name='gemini-2.5-flash', system_instruction=combined_instruction)
             
-            response = model.generate_content(question)
+            # Non-blocking thread execution for Gemini response
+            response = await asyncio.to_thread(model.generate_content, question)
             answer = response.text
             formatted_response = f"**Your question:** {question}\n\n**Answer:** {answer}"
             if len(formatted_response) > 2000:
@@ -114,7 +116,9 @@ class FactionBotCommands(commands.Cog):
                 {"$set": {"info": information}},
                 upsert=True
             )
-        await interaction.followup.send(f"📥 **Memory Updated!** Saved detail for `{topic}`.")
+            await interaction.followup.send(f"📥 **Memory Updated!** Saved detail for `{topic}`.")
+        else:
+            await interaction.followup.send("❌ Database connection error.")
 
     @app_commands.command(name="recall", description="Ask the Dragon to recall something it remembered")
     async def recall(self, interaction: discord.Interaction, topic: str):
@@ -135,7 +139,9 @@ class FactionBotCommands(commands.Cog):
     @app_commands.checks.cooldown(1, 10.0, key=lambda i: i.user.id)
     async def readweb(self, interaction: discord.Interaction, url: str):
         await interaction.response.defer()
-        web_raw_data = fetch_web_content(url)
+        
+        # Non-blocking web scraping execution
+        web_raw_data = await asyncio.to_thread(fetch_web_content, url)
         
         if "Error:" in web_raw_data:
             await interaction.followup.send(f"🔥 {web_raw_data}")
@@ -146,7 +152,9 @@ class FactionBotCommands(commands.Cog):
             model = genai.GenerativeModel(model_name="gemini-2.5-flash", system_instruction=combined_instruction)
             
             ai_prompt = f"Website URL: {url}\nWebsite Content:\n{web_raw_data}"
-            response = model.generate_content(ai_prompt)
+            
+            # Non-blocking Gemini call
+            response = await asyncio.to_thread(model.generate_content, ai_prompt)
             summary = response.text
             
             await interaction.followup.send(f"🌐 **Web Reader Report:** {url}\n\n{summary}")
@@ -236,10 +244,19 @@ class FactionBotCommands(commands.Cog):
             await interaction.followup.send("🔥 *Grrr...* I can't read this file format!")
             return
         try:
-            file_response = requests.get(attachment.url)
-            attachment_data = {'mime_type': attachment.content_type, 'data': file_response.content}
-            response_text = await self.bot.get_gemini_response(prompt, interaction.user.id, attachment_data)
-            await interaction.followup.send(f"🐉 **FlamingDeath Vision:** {response_text}")
+            attachment_data = None
+            # Non-blocking async download using bot's aiohttp session
+            if self.bot.session:
+                async with self.bot.session.get(attachment.url) as resp:
+                    if resp.status == 200:
+                        file_bytes = await resp.read()
+                        attachment_data = {'mime_type': attachment.content_type, 'data': file_bytes}
+            
+            if attachment_data:
+                response_text = await self.bot.get_gemini_response(prompt, interaction.user.id, attachment_data)
+                await interaction.followup.send(f"🐉 **FlamingDeath Vision:** {response_text}")
+            else:
+                await interaction.followup.send("🔥 Could not download attachment.")
         except Exception as e:
             await interaction.followup.send(f"🔥 Error: {str(e)}")
 
@@ -257,4 +274,4 @@ class FactionBotCommands(commands.Cog):
 
 async def setup(bot):
     await bot.add_cog(FactionBotCommands(bot))
-            
+        
