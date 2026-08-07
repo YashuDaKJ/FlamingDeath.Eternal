@@ -83,7 +83,8 @@ class FactionBotCommands(commands.Cog):
             color=discord.Color.teal()
         )
         embed.set_footer(text="Guarding Eternal since 2025")
-        await interaction.response.send_message(embed=embed, view=HelpView(), ephemeral=True)
+        # Made public by changing ephemeral to False
+        await interaction.response.send_message(embed=embed, view=HelpView(), ephemeral=False)
 
     @app_commands.command(name="ask", description="Ask FlamingDeath anything, anywhere!")
     @app_commands.checks.cooldown(1, 5.0, key=lambda i: i.user.id)
@@ -278,4 +279,4 @@ class FactionBotCommands(commands.Cog):
 
 async def setup(bot):
     await bot.add_cog(FactionBotCommands(bot))
-    
+            
