@@ -15,6 +15,7 @@ class ExpeditionView(discord.ui.View):
         self.chosen = False
 
     async def handle_choice(self, interaction: discord.Interaction, choice_type: str):
+        # Keep button error messages ephemeral so they don't clutter the public channel
         if interaction.user.id != self.user_id:
             await interaction.response.send_message("❌ This is not your expedition! Start your own with `/expedition`.", ephemeral=True)
             return
@@ -361,4 +362,4 @@ class EconomyCog(commands.Cog):
 
 async def setup(bot):
     await bot.add_cog(EconomyCog(bot))
-                             
+        
