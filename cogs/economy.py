@@ -117,7 +117,7 @@ class ExpeditionView(discord.ui.View):
                 {"text": "🏛️ Jackpot! You unearthed a hidden relic of the Faceless Dragon. The Eternal treasury will be pleased!", "crystals": random.randint(200, 350), "color": discord.Color.gold()}
             ],
             "wilderness": [
-                {"text": "🌲 You foraged in the SquareOne wilderness and found some scattered crystal fragments.", "crystals": random.randint(20, 50), "color": discord.Color.dark_green()},
+                {"text": "🌲 You foraged in a server wilderness and found some scattered crystal fragments.", "crystals": random.randint(20, 50), "color": discord.Color.dark_green()},
                 {"text": "🌲 You got lost in a dense forest and spent the whole day just finding your way back to base.", "crystals": 0, "color": discord.Color.dark_grey()},
                 {"text": "🌲 A wandering merchant traded you a pouch of crystals for your travel rations!", "crystals": random.randint(80, 150), "color": discord.Color.purple()}
             ]
@@ -174,7 +174,6 @@ class EconomyCog(commands.Cog):
             "last_expedition": 0,
             "last_work": 0,
             "last_daily": 0,
-            "last_rob": 0,
             "last_crime": 0,
             "daily_streak": 0
         }
@@ -313,7 +312,7 @@ class EconomyCog(commands.Cog):
             )
 
         jobs = [
-            f"🧱 You helped construct a massive new wing of the base on the SquareOne server. You earned ✨ **{reward} Crystals**.",
+            f"🧱 You helped construct a massive new wing of the base on a server. You earned ✨ **{reward} Crystals**.",
             f"🐲 You fed and cleaned the scales of the Faceless Dragon statue. The faction pays you ✨ **{reward} Crystals**.",
             f"⛏️ You spent the shift strip-mining in the Minetest caves and found ✨ **{reward} Crystals**.",
             f"⚔️ You successfully defended the perimeter from a rogue mob attack. You were rewarded ✨ **{reward} Crystals**."
@@ -322,7 +321,7 @@ class EconomyCog(commands.Cog):
         await interaction.followup.send(random.choice(jobs))
 
     # ==========================================
-    # 🦹 PLAYER INTERACTION, ROB & CRIME
+    # 🦹 PLAYER INTERACTION & CRIME
     # ==========================================
     @app_commands.command(name="give", description="Transfer your Dragon Crystals to another faction member.")
     @app_commands.describe(member="The member receiving the crystals", amount="Amount to transfer")
@@ -368,81 +367,6 @@ class EconomyCog(commands.Cog):
             color=discord.Color.green()
         )
         await interaction.followup.send(content=member.mention, embed=embed)
-
-    @app_commands.command(name="rob", description="Attempt to steal crystals from another Eternal member... if you dare.")
-    @app_commands.describe(member="The target of your heist")
-    async def rob(self, interaction: discord.Interaction, member: discord.Member):
-        await interaction.response.defer()
-        robber_id = interaction.user.id
-        target_id = member.id
-        current_time = int(time.time())
-
-        if robber_id == target_id:
-            await interaction.followup.send("❌ You can't rob yourself... that's just moving money between pockets.")
-            return
-
-        if member.bot:
-            await interaction.followup.send("🔥 *FlamingDeath growls...* Leave the bots alone.")
-            return
-
-        robber_profile = await self._get_or_create_profile(robber_id)
-        last_rob = robber_profile.get("last_rob", 0)
-        
-        cooldown = 7200 
-        if current_time - last_rob < cooldown:
-            remaining_mins = int((cooldown - (current_time - last_rob)) // 60)
-            await interaction.followup.send(f"🚨 The faction guards are still looking for you! Lay low for `{remaining_mins} minutes`.")
-            return
-
-        target_profile = await self._get_or_create_profile(target_id)
-        target_balance = target_profile.get("crystals", 0)
-        robber_balance = robber_profile.get("crystals", 0)
-
-        if target_balance < 50:
-            await interaction.followup.send(f"❌ {member.display_name} has less than 50 Crystals. It's not worth the risk!")
-            return
-            
-        if robber_balance < 50:
-            await interaction.followup.send("❌ You need at least 50 Crystals to pay the fine if you get caught!")
-            return
-
-        success = random.random() < 0.40 
-
-        if success:
-            steal_percentage = random.uniform(0.10, 0.30)
-            amount_stolen = int(target_balance * steal_percentage)
-
-            if self.bot.profiles is not None:
-                await self.bot.profiles.update_one({"_id": str(target_id)}, {"$inc": {"crystals": -amount_stolen}}, upsert=True)
-                await self.bot.profiles.update_one(
-                    {"_id": str(robber_id)}, 
-                    {"$inc": {"crystals": amount_stolen}, "$set": {"last_rob": current_time}}, 
-                    upsert=True
-                )
-
-            embed = discord.Embed(
-                title="🥷 Heist Successful!",
-                description=f"You slipped into {member.mention}'s base and stole ✨ **{amount_stolen} Crystals**!",
-                color=discord.Color.dark_theme()
-            )
-            await interaction.followup.send(content=member.mention, embed=embed)
-        else:
-            penalty_percentage = random.uniform(0.10, 0.25)
-            fine = int(robber_balance * penalty_percentage)
-
-            if self.bot.profiles is not None:
-                await self.bot.profiles.update_one(
-                    {"_id": str(robber_id)}, 
-                    {"$inc": {"crystals": -fine}, "$set": {"last_rob": current_time}}, 
-                    upsert=True
-                )
-                
-            embed = discord.Embed(
-                title="🚨 BUSTED!",
-                description=f"You triggered a trap at {member.mention}'s base! The faction guards caught you and fined you ✨ **{fine} Crystals**.",
-                color=discord.Color.red()
-            )
-            await interaction.followup.send(embed=embed)
 
     @app_commands.command(name="crime", description="Commit a risky crime for a massive payout.")
     async def crime(self, interaction: discord.Interaction):
@@ -654,4 +578,3 @@ class EconomyCog(commands.Cog):
 
 async def setup(bot):
     await bot.add_cog(EconomyCog(bot))
-                                 
