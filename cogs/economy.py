@@ -313,7 +313,7 @@ class EconomyCog(commands.Cog):
 
         jobs = [
             f"🧱 You helped construct a massive new wing of the base on a server. You earned ✨ **{reward} Crystals**.",
-            f"🐲 You fed and cleaned the scales of the Faceless Dragon statue. The faction pays you ✨ **{reward} Crystals**.",
+            f"🐲 You fed and cleaned the scales of the Dragon statue. The faction pays you ✨ **{reward} Crystals**.",
             f"⛏️ You spent the shift strip-mining in the Minetest caves and found ✨ **{reward} Crystals**.",
             f"⚔️ You successfully defended the perimeter from a rogue mob attack. You were rewarded ✨ **{reward} Crystals**."
         ]
