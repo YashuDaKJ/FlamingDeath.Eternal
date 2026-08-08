@@ -38,7 +38,7 @@ class ExpeditionView(discord.ui.View):
             "ruins": [
                 {"text": "🏛️ You explored an old rival outpost and secured some abandoned treasury supplies.", "crystals": random.randint(50, 100), "color": discord.Color.green()},
                 {"text": "🏛️ You triggered a harmless tripwire! A net dropped on you, delaying your search. You found nothing.", "crystals": 0, "color": discord.Color.orange()},
-                {"text": "🏛️ Jackpot! You unearthed a hidden relic of the Faceless Dragon. The ETERNAL treasury will be pleased!", "crystals": random.randint(200, 350), "color": discord.Color.gold()}
+                {"text": "🏛️ Jackpot! You unearthed a hidden relic of the Faceless Dragon. The Eternal treasury will be pleased!", "crystals": random.randint(200, 350), "color": discord.Color.gold()}
             ],
             "wilderness": [
                 {"text": "🌲 You foraged in the SquareOne wilderness and found some scattered crystal fragments.", "crystals": random.randint(20, 50), "color": discord.Color.dark_green()},
@@ -106,7 +106,7 @@ class EconomyCog(commands.Cog):
             await self.bot.profiles.insert_one(profile)
         return profile
 
-    @app_commands.command(name="profile", description="Check your ETERNAL faction member card")
+    @app_commands.command(name="profile", description="Check your Eternal faction member card")
     async def profile(self, interaction: discord.Interaction):
         await interaction.response.defer()
         user = interaction.user
@@ -115,14 +115,14 @@ class EconomyCog(commands.Cog):
         profile = await self._get_or_create_profile(user.id)
         crystals = profile.get("crystals", 0)
         
-        embed = discord.Embed(title=f"⚔️ ETERNAL Member Profile: {user.name}", color=discord.Color.blue())
+        embed = discord.Embed(title=f"⚔️ Eternal Member Profile: {user.name}", color=discord.Color.blue())
         embed.set_thumbnail(url=user.display_avatar.url)
         embed.add_field(name="Faction Standing", value="**Loyal Member** 🛡️", inline=True)
         embed.add_field(name="Dragon Crystals", value=f"✨ `{crystals}` Crystals", inline=True)
         embed.add_field(name="Arrival Date", value=f"📅 {joined_at}", inline=False)
         await interaction.followup.send(embed=embed)
 
-    @app_commands.command(name="leaderboard", description="View the top dragon crystal hoarders in ETERNAL!")
+    @app_commands.command(name="leaderboard", description="View the top dragon crystal hoarders in Eternal!")
     async def leaderboard(self, interaction: discord.Interaction):
         await interaction.response.defer()
 
@@ -140,7 +140,7 @@ class EconomyCog(commands.Cog):
                 return
 
             embed = discord.Embed(
-                title="🏆 ETERNAL Faction Leaderboard — Top Crystal Hoarders",
+                title="🏆 Eternal Faction Leaderboard — Top Crystal Hoarders",
                 color=discord.Color.gold()
             )
 
@@ -192,7 +192,7 @@ class EconomyCog(commands.Cog):
         embed = discord.Embed(
             title="⚔️ Choose Your Expedition Path",
             description=(
-                "You are leaving the safety of the ETERNAL base to hunt for resources.\n\n"
+                "You are leaving the safety of the Eternal base to hunt for resources.\n\n"
                 "**Where will you go?**\n"
                 "⛏️ **Deep Caverns:** High risk, high reward crystal mining.\n"
                 "🏛️ **Ancient Ruins:** Explore forgotten monuments and outposts.\n"
@@ -208,17 +208,17 @@ class EconomyCog(commands.Cog):
     # ==========================================
     # 🛡️ ADMIN REWARD COMMANDS
     # ==========================================
-    @app_commands.command(name="give_everyone", description="Give Dragon Crystals to all server members (Admin Only)")
-    @app_commands.describe(amount="Amount of crystals to give to everyone")
+    @app_commands.command(name="give_everyone", description="FlamingDeath bestows Dragon Crystals upon the entire faction. (Admin Only)")
+    @app_commands.describe(amount="Amount of crystals to bestow upon everyone")
     async def give_everyone(self, interaction: discord.Interaction, amount: int):
-        await interaction.response.defer()
+        await interaction.response.defer(ephemeral=True) # Hide the response from public chat
 
         if not interaction.user.guild_permissions.administrator:
-            await interaction.followup.send("❌ Only server admins can use this command!", ephemeral=True)
+            await interaction.followup.send("❌ You lack the authority to command the Dragon.", ephemeral=True)
             return
 
         if amount <= 0:
-            await interaction.followup.send("❌ Amount must be greater than 0!", ephemeral=True)
+            await interaction.followup.send("❌ The Dragon requires a tribute greater than 0!", ephemeral=True)
             return
 
         if self.bot.profiles is not None:
@@ -229,11 +229,21 @@ class EconomyCog(commands.Cog):
             )
 
         embed = discord.Embed(
-            title="🎉 FACTION TREASURY BONUS! 🎉",
-            description=f"**@everyone** has been awarded **✨ {amount} Dragon Crystals** by {interaction.user.mention}!",
-            color=discord.Color.gold()
+            title="🔥 THE DRAGON HAS SPOKEN! 🔥",
+            description=(
+                f"**@everyone, hear me!**\n\n"
+                f"I, **FlamingDeath**, have decided to reward the Eternal faction.\n"
+                f"I have bestowed **✨ {amount} Dragon Crystals** upon every soul in this realm.\n\n"
+                f"*Check your `/profile`... if you dare.*"
+            ),
+            color=discord.Color.red() 
         )
-        await interaction.followup.send(content="@everyone", embed=embed)
+        
+        # Send the public announcement to the channel where the command was used
+        await interaction.channel.send(content="@everyone", embed=embed)
+        
+        # Confirm privately to the admin that it worked
+        await interaction.followup.send(f"✅ Successfully distributed {amount} crystals to everyone on behalf of FlamingDeath.", ephemeral=True)
 
     @app_commands.command(name="give_role", description="Give Dragon Crystals to members with a specific role (Admin Only)")
     @app_commands.describe(role="The role to receive crystals", amount="Amount of crystals")
@@ -296,7 +306,7 @@ class EconomyCog(commands.Cog):
             
         scenarios = [
             f"🐉 You flew into the sky with FlamingDeath and raided an enemy base! Found **{crystals_found}** Crystals! 🔥",
-            f"⚔️ You cleared out rogue monsters threatening ETERNAL. Earned **{crystals_found}** Crystals!",
+            f"⚔️ You cleared out rogue monsters threatening Eternal. Earned **{crystals_found}** Crystals!",
             f"💎 You discovered a hidden crystalline cave! Extracted **{crystals_found}** Crystals!"
         ]
         await interaction.followup.send(random.choice(scenarios))
@@ -345,7 +355,7 @@ class EconomyCog(commands.Cog):
             
         items = ["🐉", "💎", "⚔️", "🔥", "🍉"]
         slot1, slot2, slot3 = random.choice(items), random.choice(items), random.choice(items)
-        embed = discord.Embed(title="🎰 ETERNAL DRAGON SLOTS 🎰", color=discord.Color.gold())
+        embed = discord.Embed(title="🎰 Eternal DRAGON SLOTS 🎰", color=discord.Color.gold())
         embed.description = f"\n> **[ {slot1} | {slot2} | {slot3} ]**\n"
         
         if slot1 == slot2 == slot3:
