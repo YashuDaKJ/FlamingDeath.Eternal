@@ -31,8 +31,9 @@ Thread(target=run_web_server, daemon=True).start()
 DISCORD_TOKEN = os.getenv('DISCORD_TOKEN')
 MONGO_URI = os.getenv('MONGO_URI')
 
-# Load primary and fallback API keys
+# Load all primary and fallback API keys
 API_KEYS = [
+    os.getenv('GEMINI_API_KEY'),
     os.getenv('GEMINI_KEY_1'),
     os.getenv('GEMINI_KEY_2')
 ]
@@ -43,7 +44,7 @@ if not DISCORD_TOKEN:
     raise ValueError("DISCORD_TOKEN must be set!")
 
 if not API_KEYS:
-    raise ValueError("At least one GEMINI_KEY (GEMINI_KEY_1 or GEMINI_KEY_2) must be set!")
+    raise ValueError("At least one GEMINI key (GEMINI_API_KEY, GEMINI_KEY_1, or GEMINI_KEY_2) must be set!")
 
 SPECIAL_CHANNEL_ID = 1521899264265945109
 
@@ -241,4 +242,4 @@ async def on_message(message):
 
 if __name__ == "__main__":
     bot.run(DISCORD_TOKEN)
-            
+                
