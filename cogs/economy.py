@@ -17,7 +17,7 @@ class ExpeditionView(discord.ui.View):
     async def handle_choice(self, interaction: discord.Interaction, choice_type: str):
         # Keep button error messages ephemeral so they don't clutter the public channel
         if interaction.user.id != self.user_id:
-            await interaction.response.send_message("❌ This is not your expedition! Start your own with `/expedition`.", ephemeral=True)
+            await interaction.response.send_message("❌ This is not your expedition! Start your own with `/play`.", ephemeral=True)
             return
 
         if self.chosen:
@@ -166,8 +166,8 @@ class EconomyCog(commands.Cog):
             print(f"Error fetching leaderboard: {e}")
             await interaction.followup.send("❌ *An error occurred while loading the leaderboard ranks.*", ephemeral=True)
 
-    @app_commands.command(name="expedition", description="Embark on an interactive journey to find Crystals!")
-    async def expedition(self, interaction: discord.Interaction):
+    @app_commands.command(name="play", description="Embark on an interactive journey to find Crystals!")
+    async def play(self, interaction: discord.Interaction):
         await interaction.response.defer()
         user_id = interaction.user.id
         current_time = int(time.time())
@@ -211,7 +211,7 @@ class EconomyCog(commands.Cog):
     @app_commands.command(name="give_everyone", description="FlamingDeath bestows Dragon Crystals upon the entire faction. (Admin Only)")
     @app_commands.describe(amount="Amount of crystals to bestow upon everyone")
     async def give_everyone(self, interaction: discord.Interaction, amount: int):
-        await interaction.response.defer(ephemeral=True) # Hide the response from public chat
+        await interaction.response.defer(ephemeral=True) # Hide response from public chat
 
         if not interaction.user.guild_permissions.administrator:
             await interaction.followup.send("❌ You lack the authority to command the Dragon.", ephemeral=True)
@@ -239,11 +239,42 @@ class EconomyCog(commands.Cog):
             color=discord.Color.red() 
         )
         
-        # Send the public announcement to the channel where the command was used
         await interaction.channel.send(content="@everyone", embed=embed)
-        
-        # Confirm privately to the admin that it worked
         await interaction.followup.send(f"✅ Successfully distributed {amount} crystals to everyone on behalf of FlamingDeath.", ephemeral=True)
+
+    @app_commands.command(name="give_player", description="FlamingDeath bestows Dragon Crystals upon a specific soul. (Admin Only)")
+    @app_commands.describe(member="The player to receive crystals", amount="Amount of crystals to bestow")
+    async def give_player(self, interaction: discord.Interaction, member: discord.Member, amount: int):
+        await interaction.response.defer(ephemeral=True) # Hide response from public chat
+
+        if not interaction.user.guild_permissions.administrator:
+            await interaction.followup.send("❌ You lack the authority to command the Dragon.", ephemeral=True)
+            return
+
+        if amount <= 0:
+            await interaction.followup.send("❌ The Dragon requires a tribute greater than 0!", ephemeral=True)
+            return
+
+        if self.bot.profiles is not None:
+            await self.bot.profiles.update_one(
+                {"_id": str(member.id)},
+                {"$inc": {"crystals": amount}},
+                upsert=True
+            )
+
+        embed = discord.Embed(
+            title="🔥 A DRAGON'S BLESSING! 🔥",
+            description=(
+                f"Hear me, {member.mention}!\n\n"
+                f"I, **FlamingDeath**, have deemed you worthy of the Eternal treasury.\n"
+                f"I bestow upon you **✨ {amount} Dragon Crystals**.\n\n"
+                f"*Use them wisely... or face my wrath.*"
+            ),
+            color=discord.Color.red() 
+        )
+        
+        await interaction.channel.send(content=member.mention, embed=embed)
+        await interaction.followup.send(f"✅ Successfully distributed {amount} crystals to {member.display_name} on behalf of FlamingDeath.", ephemeral=True)
 
     @app_commands.command(name="give_role", description="Give Dragon Crystals to members with a specific role (Admin Only)")
     @app_commands.describe(role="The role to receive crystals", amount="Amount of crystals")
@@ -372,4 +403,4 @@ class EconomyCog(commands.Cog):
 
 async def setup(bot):
     await bot.add_cog(EconomyCog(bot))
-        
+                    
