@@ -56,6 +56,7 @@ class HelpDropdown(discord.ui.Select):
         elif self.values[0] == "Faction Games & RPG":
             embed = discord.Embed(title="⚔️ Faction Games & Economy System", color=discord.Color.dark_red())
             embed.add_field(name="`/profile`", value="View your member card and Crystal balance.", inline=False)
+            embed.add_field(name="`/play`", value="Embark on interactive journeys to hunt for Crystals (1h cooldown).", inline=False)
             embed.add_field(name="`/hunt`", value="Hunt for Dragon Crystals (1h cooldown).", inline=False)
             embed.add_field(name="`/coinflip`", value="Bet crystals on Heads or Tails!", inline=False)
             embed.add_field(name="`/slots`", value="Try your luck on the Dragon Slot Machine (Cost: 10 Crystals).", inline=False)
@@ -83,7 +84,6 @@ class FactionBotCommands(commands.Cog):
             color=discord.Color.teal()
         )
         embed.set_footer(text="Guarding Eternal since 2025")
-        # Made public by changing ephemeral to False
         await interaction.response.send_message(embed=embed, view=HelpView(), ephemeral=False)
 
     @app_commands.command(name="ask", description="Ask FlamingDeath anything, anywhere!")
@@ -94,7 +94,6 @@ class FactionBotCommands(commands.Cog):
             combined_instruction = f"{faction_data.SYSTEM_PROMPT}\n\nAdditional Faction Information:\n{faction_data.FACTION_PROMPT}"
             model = genai.GenerativeModel(model_name='gemini-2.5-flash', system_instruction=combined_instruction)
             
-            # Non-blocking thread execution for Gemini response
             response = await asyncio.to_thread(model.generate_content, question)
             answer = response.text
             formatted_response = f"**Your question:** {question}\n\n**Answer:** {answer}"
@@ -145,7 +144,6 @@ class FactionBotCommands(commands.Cog):
     async def readweb(self, interaction: discord.Interaction, url: str):
         await interaction.response.defer()
         
-        # Non-blocking web scraping execution
         web_raw_data = await asyncio.to_thread(fetch_web_content, url)
         
         if "Error:" in web_raw_data:
@@ -158,7 +156,6 @@ class FactionBotCommands(commands.Cog):
             
             ai_prompt = f"Website URL: {url}\nWebsite Content:\n{web_raw_data}"
             
-            # Non-blocking Gemini call
             response = await asyncio.to_thread(model.generate_content, ai_prompt)
             summary = response.text
             
@@ -170,7 +167,7 @@ class FactionBotCommands(commands.Cog):
                 await interaction.followup.send(f"🔥 Web read error: {str(e)}")
 
     # ----------------------------------------------------
-    # UPDATED COPY COMMAND (Supports Text, Message ID, Attachments, Reactions & Replies)
+    # UPDATED COPY COMMAND
     # ----------------------------------------------------
     @app_commands.command(name="copy", description="Copy a message, send text, or reply to a message anonymously (Admin Only)")
     @app_commands.describe(
@@ -194,28 +191,23 @@ class FactionBotCommands(commands.Cog):
         destination = target_channel or interaction.channel
 
         try:
-            # Check if user passed a numeric Message ID
             if message_input.strip().isdigit():
                 msg_id = int(message_input.strip())
                 original_msg = await interaction.channel.fetch_message(msg_id)
                 
                 if reply_text:
-                    # Reply directly to the original message
                     await original_msg.reply(reply_text)
                     await interaction.followup.send(
                         f"🤫 **Secret Output:** Replied to message `{msg_id}` in {interaction.channel.mention}!", 
                         ephemeral=True
                     )
                 else:
-                    # Download attachments into memory
                     files = []
                     for attachment in original_msg.attachments:
                         files.append(await attachment.to_file())
                     
-                    # Send text and attachments to target channel
                     new_msg = await destination.send(content=original_msg.content, files=files)
                     
-                    # Clone reactions
                     for reaction in original_msg.reactions:
                         try:
                             await new_msg.add_reaction(reaction.emoji)
@@ -227,7 +219,6 @@ class FactionBotCommands(commands.Cog):
                         ephemeral=True
                     )
             else:
-                # Treat message_input as standard raw text string
                 await destination.send(content=message_input)
                 await interaction.followup.send(
                     f"🤫 **Secret Output:** Dispatched text directly to {destination.mention}!", 
@@ -250,7 +241,6 @@ class FactionBotCommands(commands.Cog):
             return
         try:
             attachment_data = None
-            # Non-blocking async download using bot's aiohttp session
             if self.bot.session:
                 async with self.bot.session.get(attachment.url) as resp:
                     if resp.status == 200:
@@ -279,4 +269,4 @@ class FactionBotCommands(commands.Cog):
 
 async def setup(bot):
     await bot.add_cog(FactionBotCommands(bot))
-            
+        
