@@ -5,17 +5,94 @@ from discord import app_commands
 from discord.ext import commands
 
 # ==========================================
+# 🌟 HIGH-LOW MINI-GAME UI (Pancake Style)
+# ==========================================
+class HighLowView(discord.ui.View):
+    def __init__(self, user_id: int, bet: int, hint_number: int, bot):
+        super().__init__(timeout=30.0)
+        self.user_id = user_id
+        self.bet = bet
+        self.hint_number = hint_number
+        self.bot = bot
+        self.secret_number = random.randint(1, 100)
+        self.chosen = False
+
+    async def handle_choice(self, interaction: discord.Interaction, choice: str):
+        if interaction.user.id != self.user_id:
+            await interaction.response.send_message("❌ This is not your game! Start your own with `/highlow`.", ephemeral=True)
+            return
+
+        if self.chosen:
+            return
+
+        self.chosen = True
+        for child in self.children:
+            child.disabled = True
+
+        won = False
+        if choice == "higher" and self.secret_number > self.hint_number:
+            won = True
+        elif choice == "lower" and self.secret_number < self.hint_number:
+            won = True
+        elif choice == "jackpot" and self.secret_number == self.hint_number:
+            won = True
+
+        if won:
+            multiplier = 10 if choice == "jackpot" else 2
+            winnings = self.bet * multiplier
+            
+            if self.bot.profiles is not None:
+                await self.bot.profiles.update_one(
+                    {"_id": str(self.user_id)},
+                    {"$inc": {"crystals": winnings - self.bet}},
+                    upsert=True
+                )
+            
+            embed = discord.Embed(
+                title="📈 High-Low Results: VICTORY!", 
+                description=f"The secret number was **{self.secret_number}**!\n\nYou guessed **{choice.upper()}** and won ✨ **{winnings} Crystals**!", 
+                color=discord.Color.teal()
+            )
+        else:
+            if self.bot.profiles is not None:
+                await self.bot.profiles.update_one(
+                    {"_id": str(self.user_id)},
+                    {"$inc": {"crystals": -self.bet}},
+                    upsert=True
+                )
+                
+            embed = discord.Embed(
+                title="📉 High-Low Results: DEFEAT!", 
+                description=f"The secret number was **{self.secret_number}**!\n\nYou guessed **{choice.upper()}** and lost your bet of ✨ **{self.bet} Crystals**.", 
+                color=discord.Color.red()
+            )
+
+        await interaction.response.edit_message(embed=embed, view=self)
+
+    @discord.ui.button(label="Higher", style=discord.ButtonStyle.success, emoji="⬆️")
+    async def btn_higher(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self.handle_choice(interaction, "higher")
+
+    @discord.ui.button(label="Jackpot", style=discord.ButtonStyle.primary, emoji="🎯")
+    async def btn_jackpot(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self.handle_choice(interaction, "jackpot")
+
+    @discord.ui.button(label="Lower", style=discord.ButtonStyle.danger, emoji="⬇️")
+    async def btn_lower(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await self.handle_choice(interaction, "lower")
+
+
+# ==========================================
 # 🌟 INTERACTIVE EXPEDITION UI
 # ==========================================
 class ExpeditionView(discord.ui.View):
     def __init__(self, user_id: int, bot):
-        super().__init__(timeout=30.0)  # Player has 30 seconds to choose
+        super().__init__(timeout=30.0) 
         self.user_id = user_id
         self.bot = bot
         self.chosen = False
 
     async def handle_choice(self, interaction: discord.Interaction, choice_type: str):
-        # Keep button error messages ephemeral so they don't clutter the public channel
         if interaction.user.id != self.user_id:
             await interaction.response.send_message("❌ This is not your expedition! Start your own with `/play`.", ephemeral=True)
             return
@@ -25,13 +102,12 @@ class ExpeditionView(discord.ui.View):
 
         self.chosen = True
         
-        # Disable all buttons upon selection
         for child in self.children:
             child.disabled = True
 
         events = {
             "caverns": [
-                {"text": "⛏️ You mined deep into an abandoned mineshaft and discovered rare crystals!", "crystals": random.randint(40, 80), "color": discord.Color.blue()},
+                {"text": "⛏️ You mined deep into an abandoned mineshaft and discovered rare crystals!", "crystals": random.randint(40, 80), "color": discord.Color.teal()},
                 {"text": "⛏️ Your pickaxe broke on some bedrock. You returned empty-handed.", "crystals": 0, "color": discord.Color.light_grey()},
                 {"text": "⛏️ You stumbled upon a glowing Sky-Blue Crystal Cavern! The energy here is immense.", "crystals": random.randint(150, 250), "color": discord.Color.teal()}
             ],
@@ -91,19 +167,25 @@ class EconomyCog(commands.Cog):
         self.bot = bot
 
     async def _get_or_create_profile(self, user_id: int) -> dict:
+        default_profile = {
+            "_id": str(user_id), 
+            "crystals": 0, 
+            "last_hunt": 0, 
+            "last_expedition": 0,
+            "last_work": 0,
+            "last_daily": 0,
+            "last_rob": 0,
+            "last_crime": 0,
+            "daily_streak": 0
+        }
+
         if self.bot.profiles is None:
-            return {"_id": str(user_id), "shards": 0, "crystals": 0, "last_hunt": 0, "last_expedition": 0}
+            return default_profile
             
         profile = await self.bot.profiles.find_one({"_id": str(user_id)})
         if not profile:
-            profile = {
-                "_id": str(user_id),
-                "shards": 0,
-                "crystals": 0,
-                "last_hunt": 0,
-                "last_expedition": 0
-            }
-            await self.bot.profiles.insert_one(profile)
+            await self.bot.profiles.insert_one(default_profile)
+            return default_profile
         return profile
 
     @app_commands.command(name="profile", description="Check your Eternal faction member card")
@@ -114,11 +196,12 @@ class EconomyCog(commands.Cog):
         
         profile = await self._get_or_create_profile(user.id)
         crystals = profile.get("crystals", 0)
+        streak = profile.get("daily_streak", 0)
         
-        embed = discord.Embed(title=f"⚔️ Eternal Member Profile: {user.name}", color=discord.Color.blue())
+        embed = discord.Embed(title=f"⚔️ Eternal Member Profile: {user.name}", color=discord.Color.teal())
         embed.set_thumbnail(url=user.display_avatar.url)
-        embed.add_field(name="Faction Standing", value="**Loyal Member** 🛡️", inline=True)
         embed.add_field(name="Dragon Crystals", value=f"✨ `{crystals}` Crystals", inline=True)
+        embed.add_field(name="Daily Streak", value=f"🔥 `{streak}` Days", inline=True)
         embed.add_field(name="Arrival Date", value=f"📅 {joined_at}", inline=False)
         await interaction.followup.send(embed=embed)
 
@@ -131,7 +214,6 @@ class EconomyCog(commands.Cog):
             return
 
         try:
-            # Query top 10 profiles sorted by Dragon Crystals descending
             cursor = self.bot.profiles.find().sort("crystals", -1).limit(10)
             top_users = await cursor.to_list(length=10)
 
@@ -140,31 +222,316 @@ class EconomyCog(commands.Cog):
                 return
 
             embed = discord.Embed(
-                title="🏆 Eternal Faction Leaderboard — Top Crystal Hoarders",
+                title="🏆 Eternal Faction Leaderboard",
                 color=discord.Color.gold()
             )
 
-            medals = ["🥇", "🥈", "🥉"]
             leaderboard_text = ""
-
             for index, user_data in enumerate(top_users, start=1):
                 user_id = user_data.get("_id")
-                rank_str = medals[index - 1] if index <= 3 else f"`#{index}`"
                 crystals = user_data.get("crystals", 0)
-
-                leaderboard_text += f"{rank_str} <@{user_id}> — ✨ **{crystals:,}** Crystals\n"
+                rank_str = ["🥇", "🥈", "🥉"][index - 1] if index <= 3 else f"`#{index}`"
+                leaderboard_text += f"{rank_str} <@{user_id}> — ✨ **{crystals:,}**\n"
 
             embed.description = leaderboard_text
-            embed.set_footer(
-                text=f"Requested by {interaction.user.display_name}", 
-                icon_url=interaction.user.display_avatar.url
+            await interaction.followup.send(embed=embed)
+        except Exception as e:
+            await interaction.followup.send("❌ *An error occurred while loading the ranks.*", ephemeral=True)
+
+    # ==========================================
+    # 💰 CORE ECONOMY (Daily & Work)
+    # ==========================================
+    @app_commands.command(name="daily", description="Claim your daily faction rations and crystals!")
+    async def daily(self, interaction: discord.Interaction):
+        await interaction.response.defer()
+        user_id = interaction.user.id
+        current_time = int(time.time())
+        
+        profile = await self._get_or_create_profile(user_id)
+        last_daily = profile.get("last_daily", 0)
+        streak = profile.get("daily_streak", 0)
+        
+        time_since_last = current_time - last_daily
+        
+        if time_since_last < 86400 and last_daily != 0:
+            remaining = int((86400 - time_since_last) // 3600)
+            remaining_mins = int(((86400 - time_since_last) % 3600) // 60)
+            await interaction.followup.send(f"⏳ You have already claimed your daily rations! Come back in `{remaining}h {remaining_mins}m`.")
+            return
+
+        if time_since_last > 172800 and last_daily != 0:
+            streak = 0
+            
+        streak += 1
+        base_reward = 100
+        streak_bonus = min(streak * 10, 200)
+        total_reward = base_reward + streak_bonus
+
+        if self.bot.profiles is not None:
+            await self.bot.profiles.update_one(
+                {"_id": str(user_id)},
+                {
+                    "$inc": {"crystals": total_reward},
+                    "$set": {"last_daily": current_time, "daily_streak": streak}
+                },
+                upsert=True
             )
 
+        embed = discord.Embed(
+            title="🎁 Daily Faction Rations Claimed!",
+            description=f"You received your daily allowance of **✨ {total_reward} Crystals**!",
+            color=discord.Color.teal()
+        )
+        embed.add_field(name="Base Reward", value=f"✨ {base_reward}", inline=True)
+        embed.add_field(name="Streak Bonus", value=f"✨ +{streak_bonus}", inline=True)
+        embed.add_field(name="Current Streak", value=f"🔥 {streak} Days", inline=False)
+        
+        await interaction.followup.send(embed=embed)
+
+    @app_commands.command(name="work", description="Complete a quick task for the Eternal faction to earn crystals.")
+    async def work(self, interaction: discord.Interaction):
+        await interaction.response.defer()
+        user_id = interaction.user.id
+        current_time = int(time.time())
+        
+        profile = await self._get_or_create_profile(user_id)
+        last_work = profile.get("last_work", 0)
+        
+        cooldown = 600 
+        if current_time - last_work < cooldown:
+            remaining_mins = int((cooldown - (current_time - last_work)) // 60)
+            remaining_secs = int((cooldown - (current_time - last_work)) % 60)
+            await interaction.followup.send(f"🛡️ You are still recovering from your last shift. Wait `{remaining_mins}m {remaining_secs}s`.")
+            return
+
+        reward = random.randint(25, 65)
+        if self.bot.profiles is not None:
+            await self.bot.profiles.update_one(
+                {"_id": str(user_id)},
+                {"$inc": {"crystals": reward}, "$set": {"last_work": current_time}},
+                upsert=True
+            )
+
+        jobs = [
+            f"🧱 You helped construct a massive new wing of the base on the SquareOne server. You earned ✨ **{reward} Crystals**.",
+            f"🐲 You fed and cleaned the scales of the Faceless Dragon statue. The faction pays you ✨ **{reward} Crystals**.",
+            f"⛏️ You spent the shift strip-mining in the Minetest caves and found ✨ **{reward} Crystals**.",
+            f"⚔️ You successfully defended the perimeter from a rogue mob attack. You were rewarded ✨ **{reward} Crystals**."
+        ]
+        
+        await interaction.followup.send(random.choice(jobs))
+
+    # ==========================================
+    # 🦹 PLAYER INTERACTION, ROB & CRIME
+    # ==========================================
+    @app_commands.command(name="give", description="Transfer your Dragon Crystals to another faction member.")
+    @app_commands.describe(member="The member receiving the crystals", amount="Amount to transfer")
+    async def give(self, interaction: discord.Interaction, member: discord.Member, amount: int):
+        await interaction.response.defer()
+        sender_id = interaction.user.id
+        receiver_id = member.id
+
+        if sender_id == receiver_id:
+            await interaction.followup.send("❌ You cannot give crystals to yourself!")
+            return
+            
+        if member.bot:
+            await interaction.followup.send("❌ Bots have no need for mortal currencies.")
+            return
+
+        if amount <= 0:
+            await interaction.followup.send("❌ You must give at least `1 Crystal`.")
+            return
+
+        sender_profile = await self._get_or_create_profile(sender_id)
+        sender_balance = sender_profile.get("crystals", 0)
+
+        if sender_balance < amount:
+            await interaction.followup.send(f"❌ You lack the funds! You only have `{sender_balance}` Crystals.")
+            return
+
+        if self.bot.profiles is not None:
+            await self.bot.profiles.update_one(
+                {"_id": str(sender_id)},
+                {"$inc": {"crystals": -amount}},
+                upsert=True
+            )
+            await self.bot.profiles.update_one(
+                {"_id": str(receiver_id)},
+                {"$inc": {"crystals": amount}},
+                upsert=True
+            )
+
+        embed = discord.Embed(
+            title="💸 Crystals Transferred!",
+            description=f"**{interaction.user.display_name}** generously gifted ✨ **{amount} Crystals** to {member.mention}!",
+            color=discord.Color.green()
+        )
+        await interaction.followup.send(content=member.mention, embed=embed)
+
+    @app_commands.command(name="rob", description="Attempt to steal crystals from another Eternal member... if you dare.")
+    @app_commands.describe(member="The target of your heist")
+    async def rob(self, interaction: discord.Interaction, member: discord.Member):
+        await interaction.response.defer()
+        robber_id = interaction.user.id
+        target_id = member.id
+        current_time = int(time.time())
+
+        if robber_id == target_id:
+            await interaction.followup.send("❌ You can't rob yourself... that's just moving money between pockets.")
+            return
+
+        if member.bot:
+            await interaction.followup.send("🔥 *FlamingDeath growls...* Leave the bots alone.")
+            return
+
+        robber_profile = await self._get_or_create_profile(robber_id)
+        last_rob = robber_profile.get("last_rob", 0)
+        
+        cooldown = 7200 
+        if current_time - last_rob < cooldown:
+            remaining_mins = int((cooldown - (current_time - last_rob)) // 60)
+            await interaction.followup.send(f"🚨 The faction guards are still looking for you! Lay low for `{remaining_mins} minutes`.")
+            return
+
+        target_profile = await self._get_or_create_profile(target_id)
+        target_balance = target_profile.get("crystals", 0)
+        robber_balance = robber_profile.get("crystals", 0)
+
+        if target_balance < 50:
+            await interaction.followup.send(f"❌ {member.display_name} has less than 50 Crystals. It's not worth the risk!")
+            return
+            
+        if robber_balance < 50:
+            await interaction.followup.send("❌ You need at least 50 Crystals to pay the fine if you get caught!")
+            return
+
+        success = random.random() < 0.40 
+
+        if success:
+            steal_percentage = random.uniform(0.10, 0.30)
+            amount_stolen = int(target_balance * steal_percentage)
+
+            if self.bot.profiles is not None:
+                await self.bot.profiles.update_one({"_id": str(target_id)}, {"$inc": {"crystals": -amount_stolen}}, upsert=True)
+                await self.bot.profiles.update_one(
+                    {"_id": str(robber_id)}, 
+                    {"$inc": {"crystals": amount_stolen}, "$set": {"last_rob": current_time}}, 
+                    upsert=True
+                )
+
+            embed = discord.Embed(
+                title="🥷 Heist Successful!",
+                description=f"You slipped into {member.mention}'s base and stole ✨ **{amount_stolen} Crystals**!",
+                color=discord.Color.dark_theme()
+            )
+            await interaction.followup.send(content=member.mention, embed=embed)
+        else:
+            penalty_percentage = random.uniform(0.10, 0.25)
+            fine = int(robber_balance * penalty_percentage)
+
+            if self.bot.profiles is not None:
+                await self.bot.profiles.update_one(
+                    {"_id": str(robber_id)}, 
+                    {"$inc": {"crystals": -fine}, "$set": {"last_rob": current_time}}, 
+                    upsert=True
+                )
+                
+            embed = discord.Embed(
+                title="🚨 BUSTED!",
+                description=f"You triggered a trap at {member.mention}'s base! The faction guards caught you and fined you ✨ **{fine} Crystals**.",
+                color=discord.Color.red()
+            )
             await interaction.followup.send(embed=embed)
 
-        except Exception as e:
-            print(f"Error fetching leaderboard: {e}")
-            await interaction.followup.send("❌ *An error occurred while loading the leaderboard ranks.*", ephemeral=True)
+    @app_commands.command(name="crime", description="Commit a risky crime for a massive payout.")
+    async def crime(self, interaction: discord.Interaction):
+        await interaction.response.defer()
+        user_id = interaction.user.id
+        current_time = int(time.time())
+        
+        profile = await self._get_or_create_profile(user_id)
+        last_crime = profile.get("last_crime", 0)
+        current_balance = profile.get("crystals", 0)
+        
+        cooldown = 2700 
+        if current_time - last_crime < cooldown:
+            remaining_mins = int((cooldown - (current_time - last_crime)) // 60)
+            await interaction.followup.send(f"🚓 The heat is too high. Wait `{remaining_mins} minutes` before committing another crime.")
+            return
+
+        if current_balance < 100:
+            await interaction.followup.send("❌ You need at least `100 Crystals` to cover potential fines before attempting a crime!")
+            return
+
+        success = random.random() < 0.45
+
+        if success:
+            reward = random.randint(150, 400)
+            if self.bot.profiles is not None:
+                await self.bot.profiles.update_one(
+                    {"_id": str(user_id)},
+                    {"$inc": {"crystals": reward}, "$set": {"last_crime": current_time}},
+                    upsert=True
+                )
+                
+            scenarios = [
+                f"💻 You hacked into a rival faction's database and stole their crystal coordinates! Earned ✨ **{reward}**.",
+                f"🏴‍☠️ You successfully smuggled illegal redstone components past the server admins. Paid ✨ **{reward}**.",
+                f"🐉 You siphoned raw energy from the Faceless Dragon statue and sold it on the black market for ✨ **{reward}**."
+            ]
+            embed = discord.Embed(title="💰 Crime Pays!", description=random.choice(scenarios), color=discord.Color.green())
+            await interaction.followup.send(embed=embed)
+        else:
+            fine = random.randint(100, 250)
+            if self.bot.profiles is not None:
+                await self.bot.profiles.update_one(
+                    {"_id": str(user_id)},
+                    {"$inc": {"crystals": -fine}, "$set": {"last_crime": current_time}},
+                    upsert=True
+                )
+
+            scenarios = [
+                f"🚨 A server admin caught you griefing! You were fined ✨ **{fine}**.",
+                f"💥 The contraband TNT you were smuggling exploded in your inventory. Lost ✨ **{fine}** in damages.",
+                f"🚓 The Eternal guards caught you trespassing in the treasury. Fined ✨ **{fine}**."
+            ]
+            embed = discord.Embed(title="🚔 Caught Red-Handed!", description=random.choice(scenarios), color=discord.Color.red())
+            await interaction.followup.send(embed=embed)
+
+    # ==========================================
+    # 🎲 FACTION MINI-GAMES
+    # ==========================================
+    @app_commands.command(name="highlow", description="Gamble crystals! Guess if the secret number is Higher or Lower.")
+    @app_commands.describe(bet="Amount of crystals to bet")
+    async def highlow(self, interaction: discord.Interaction, bet: int):
+        await interaction.response.defer()
+        user_id = interaction.user.id
+        
+        profile = await self._get_or_create_profile(user_id)
+        current_balance = profile.get("crystals", 0)
+        
+        if bet < 10:
+            await interaction.followup.send("❌ The minimum bet for High-Low is `10 Crystals`.")
+            return
+        if current_balance < bet:
+            await interaction.followup.send(f"❌ You don't have enough! You only possess `{current_balance}` Crystals.")
+            return
+
+        hint_number = random.randint(10, 90)
+        
+        embed = discord.Embed(
+            title="🎲 High-Low Mini-game",
+            description=(
+                f"I have chosen a secret number between 1 and 100.\n\n"
+                f"The hint number is: **{hint_number}**\n\n"
+                f"Is the secret number **Higher** or **Lower** than the hint? (Or risk it all on an exact Jackpot match?)"
+            ),
+            color=discord.Color.teal()
+        )
+        
+        view = HighLowView(user_id, bet, hint_number, self.bot)
+        await interaction.followup.send(embed=embed, view=view)
 
     @app_commands.command(name="play", description="Embark on an interactive journey to find Crystals!")
     async def play(self, interaction: discord.Interaction):
@@ -179,7 +546,7 @@ class EconomyCog(commands.Cog):
         if current_time - last_expedition < cooldown_duration:
             remaining = cooldown_duration - (current_time - last_expedition)
             remaining_mins = int(remaining // 60)
-            await interaction.followup.send(f"⛺ You are resting from your last journey. You can launch the next expedition in `{remaining_mins} minutes`.")
+            await interaction.followup.send(f"⛺ You are resting. You can launch the next expedition in `{remaining_mins} minutes`.")
             return
 
         if self.bot.profiles is not None:
@@ -192,11 +559,10 @@ class EconomyCog(commands.Cog):
         embed = discord.Embed(
             title="⚔️ Choose Your Expedition Path",
             description=(
-                "You are leaving the safety of the Eternal base to hunt for resources.\n\n"
                 "**Where will you go?**\n"
-                "⛏️ **Deep Caverns:** High risk, high reward crystal mining.\n"
-                "🏛️ **Ancient Ruins:** Explore forgotten monuments and outposts.\n"
-                "🌲 **Wilderness:** A safer surface route with steady, modest finds.\n\n"
+                "⛏️ **Deep Caverns:** High risk, high reward.\n"
+                "🏛️ **Ancient Ruins:** Explore forgotten monuments.\n"
+                "🌲 **Wilderness:** Steady, modest finds.\n\n"
                 "*You have 30 seconds to decide...*"
             ),
             color=discord.Color.dark_theme()
@@ -204,169 +570,6 @@ class EconomyCog(commands.Cog):
         
         view = ExpeditionView(interaction.user.id, self.bot)
         await interaction.followup.send(embed=embed, view=view)
-
-    # ==========================================
-    # 🛡️ ADMIN REWARD COMMANDS
-    # ==========================================
-    @app_commands.command(name="give_everyone", description="FlamingDeath bestows Dragon Crystals upon the entire faction. (Admin Only)")
-    @app_commands.describe(amount="Amount of crystals to bestow upon everyone")
-    async def give_everyone(self, interaction: discord.Interaction, amount: int):
-        await interaction.response.defer(ephemeral=True) # Hide response from public chat
-
-        if not interaction.user.guild_permissions.administrator:
-            await interaction.followup.send("❌ You lack the authority to command the Dragon.", ephemeral=True)
-            return
-
-        if amount <= 0:
-            await interaction.followup.send("❌ The Dragon requires a tribute greater than 0!", ephemeral=True)
-            return
-
-        if self.bot.profiles is not None:
-            await self.bot.profiles.update_many(
-                {},
-                {"$inc": {"crystals": amount}},
-                upsert=True
-            )
-
-        embed = discord.Embed(
-            title="🔥 THE DRAGON HAS SPOKEN! 🔥",
-            description=(
-                f"**@everyone, hear me!**\n\n"
-                f"I, **FlamingDeath**, have decided to reward the Eternal faction.\n"
-                f"I have bestowed **✨ {amount} Dragon Crystals** upon every soul in this realm.\n\n"
-                f"*Check your `/profile`... if you dare.*"
-            ),
-            color=discord.Color.red() 
-        )
-        
-        await interaction.channel.send(content="@everyone", embed=embed)
-        await interaction.followup.send(f"✅ Successfully distributed {amount} crystals to everyone on behalf of FlamingDeath.", ephemeral=True)
-
-    @app_commands.command(name="give_player", description="FlamingDeath bestows Dragon Crystals upon a specific soul. (Admin Only)")
-    @app_commands.describe(member="The player to receive crystals", amount="Amount of crystals to bestow")
-    async def give_player(self, interaction: discord.Interaction, member: discord.Member, amount: int):
-        await interaction.response.defer(ephemeral=True) # Hide response from public chat
-
-        if not interaction.user.guild_permissions.administrator:
-            await interaction.followup.send("❌ You lack the authority to command the Dragon.", ephemeral=True)
-            return
-
-        if amount <= 0:
-            await interaction.followup.send("❌ The Dragon requires a tribute greater than 0!", ephemeral=True)
-            return
-
-        if self.bot.profiles is not None:
-            await self.bot.profiles.update_one(
-                {"_id": str(member.id)},
-                {"$inc": {"crystals": amount}},
-                upsert=True
-            )
-
-        embed = discord.Embed(
-            title="🔥 A DRAGON'S BLESSING! 🔥",
-            description=(
-                f"Hear me, {member.mention}!\n\n"
-                f"I, **FlamingDeath**, have deemed you worthy of the Eternal treasury.\n"
-                f"I bestow upon you **✨ {amount} Dragon Crystals**.\n\n"
-                f"*Use them wisely... or face my wrath.*"
-            ),
-            color=discord.Color.red() 
-        )
-        
-        await interaction.channel.send(content=member.mention, embed=embed)
-        await interaction.followup.send(f"✅ Successfully distributed {amount} crystals to {member.display_name} on behalf of FlamingDeath.", ephemeral=True)
-
-    @app_commands.command(name="give_role", description="Give Dragon Crystals to members with a specific role (Admin Only)")
-    @app_commands.describe(role="The role to receive crystals", amount="Amount of crystals")
-    async def give_role(self, interaction: discord.Interaction, role: discord.Role, amount: int):
-        await interaction.response.defer()
-
-        if not interaction.user.guild_permissions.administrator:
-            await interaction.followup.send("❌ Only server admins can use this command!", ephemeral=True)
-            return
-
-        if amount <= 0:
-            await interaction.followup.send("❌ Amount must be greater than 0!", ephemeral=True)
-            return
-
-        member_ids = [str(m.id) for m in role.members if not m.bot]
-        if member_ids and self.bot.profiles is not None:
-            await self.bot.profiles.update_many(
-                {"_id": {"$in": member_ids}},
-                {"$inc": {"crystals": amount}},
-                upsert=True
-            )
-
-        embed = discord.Embed(
-            title="🎁 ROLE REWARD DISTRIBUTED",
-            description=f"Gave **✨ {amount} Crystals** to **{len(member_ids)} members** with the {role.mention} role!",
-            color=discord.Color.green()
-        )
-        await interaction.followup.send(embed=embed)
-
-    # ==========================================
-    # FACTION MINI-GAMES
-    # ==========================================
-    @app_commands.command(name="hunt", description="Go out on a dynamic dragon hunt to collect crystals!")
-    async def hunt(self, interaction: discord.Interaction):
-        await interaction.response.defer()
-        user_id = interaction.user.id
-        current_time = int(time.time())
-        
-        profile = await self._get_or_create_profile(user_id)
-        last_hunt = profile.get("last_hunt", 0)
-        
-        cooldown_duration = 3600  # 1 hour
-        if current_time - last_hunt < cooldown_duration:
-            remaining = cooldown_duration - (current_time - last_hunt)
-            remaining_mins = int(remaining // 60)
-            await interaction.followup.send(f"🔥 *Growls...* You are exhausted! Wait `{remaining_mins} more minutes`.")
-            return
-            
-        crystals_found = random.randint(15, 50)
-        
-        if self.bot.profiles is not None:
-            await self.bot.profiles.update_one(
-                {"_id": str(user_id)},
-                {
-                    "$inc": {"crystals": crystals_found},
-                    "$set": {"last_hunt": current_time}
-                },
-                upsert=True
-            )
-            
-        scenarios = [
-            f"🐉 You flew into the sky with FlamingDeath and raided an enemy base! Found **{crystals_found}** Crystals! 🔥",
-            f"⚔️ You cleared out rogue monsters threatening Eternal. Earned **{crystals_found}** Crystals!",
-            f"💎 You discovered a hidden crystalline cave! Extracted **{crystals_found}** Crystals!"
-        ]
-        await interaction.followup.send(random.choice(scenarios))
-
-    @app_commands.command(name="coinflip", description="Bet your crystals on a coin toss!")
-    @app_commands.choices(choice=[app_commands.Choice(name="Heads", value="heads"), app_commands.Choice(name="Tails", value="tails")])
-    async def coinflip(self, interaction: discord.Interaction, choice: app_commands.Choice[str], bet: int):
-        await interaction.response.defer()
-        user_id = interaction.user.id
-        
-        profile = await self._get_or_create_profile(user_id)
-        current_balance = profile.get("crystals", 0)
-        
-        if bet <= 0:
-            await interaction.followup.send("🔥 *Grrr...* Bet at least `1 Crystal`!")
-            return
-        if current_balance < bet:
-            await interaction.followup.send(f"🔥 *Growls...* You only have `{current_balance}` Crystals!")
-            return
-            
-        result = random.choice(["heads", "tails"])
-        if choice.value == result:
-            if self.bot.profiles is not None:
-                await self.bot.profiles.update_one({"_id": str(user_id)}, {"$inc": {"crystals": bet}}, upsert=True)
-            await interaction.followup.send(f"🪙 **Coinflip:** It's **{result.upper()}**! 🎉 You win **{bet}** Crystals!")
-        else:
-            if self.bot.profiles is not None:
-                await self.bot.profiles.update_one({"_id": str(user_id)}, {"$inc": {"crystals": -bet}}, upsert=True)
-            await interaction.followup.send(f"🪙 **Coinflip:** It's **{result.upper()}**. 💀 You lost **{bet}** Crystals.")
 
     @app_commands.command(name="slots", description="Play the Dragon Slot Machine! (Cost: 10 Crystals)")
     async def slots(self, interaction: discord.Interaction):
@@ -401,6 +604,54 @@ class EconomyCog(commands.Cog):
             embed.add_field(name="💀 No Match!", value="Lost 10 Crystals.")
         await interaction.followup.send(embed=embed)
 
+    # ==========================================
+    # 🛡️ ADMIN REWARD COMMANDS
+    # ==========================================
+    @app_commands.command(name="give_everyone", description="Admin: Bestow Dragon Crystals upon the entire faction.")
+    @app_commands.describe(amount="Amount of crystals")
+    async def give_everyone(self, interaction: discord.Interaction, amount: int):
+        await interaction.response.defer(ephemeral=True)
+
+        if not interaction.user.guild_permissions.administrator:
+            await interaction.followup.send("❌ You lack the authority.", ephemeral=True)
+            return
+
+        if amount <= 0:
+            return await interaction.followup.send("❌ Amount must be greater than 0!", ephemeral=True)
+
+        if self.bot.profiles is not None:
+            await self.bot.profiles.update_many({}, {"$inc": {"crystals": amount}}, upsert=True)
+
+        embed = discord.Embed(
+            title="🔥 THE DRAGON HAS SPOKEN! 🔥",
+            description=f"**@everyone**\n\nI have bestowed **✨ {amount} Dragon Crystals** upon every soul in this realm.",
+            color=discord.Color.red() 
+        )
+        await interaction.channel.send(content="@everyone", embed=embed)
+        await interaction.followup.send(f"✅ Distributed {amount} crystals to everyone.", ephemeral=True)
+
+    @app_commands.command(name="give_player", description="Admin: Bestow Dragon Crystals upon a specific soul.")
+    @app_commands.describe(member="The player", amount="Amount of crystals")
+    async def give_player(self, interaction: discord.Interaction, member: discord.Member, amount: int):
+        await interaction.response.defer(ephemeral=True)
+
+        if not interaction.user.guild_permissions.administrator:
+            return await interaction.followup.send("❌ You lack the authority.", ephemeral=True)
+
+        if amount <= 0:
+            return await interaction.followup.send("❌ Amount must be greater than 0!", ephemeral=True)
+
+        if self.bot.profiles is not None:
+            await self.bot.profiles.update_one({"_id": str(member.id)}, {"$inc": {"crystals": amount}}, upsert=True)
+
+        embed = discord.Embed(
+            title="🔥 A DRAGON'S BLESSING! 🔥",
+            description=f"Hear me, {member.mention}!\n\nI bestow upon you **✨ {amount} Dragon Crystals**.",
+            color=discord.Color.red() 
+        )
+        await interaction.channel.send(content=member.mention, embed=embed)
+        await interaction.followup.send(f"✅ Distributed {amount} crystals to {member.display_name}.", ephemeral=True)
+
 async def setup(bot):
     await bot.add_cog(EconomyCog(bot))
-                    
+                                 
