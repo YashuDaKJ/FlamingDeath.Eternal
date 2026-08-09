@@ -111,7 +111,7 @@ class FlamingDeathBot(commands.Bot):
             try:
                 genai.configure(api_key=key)
                 model = genai.GenerativeModel(
-                    model_name='gemini-2.5-flash',
+                    model_name='gemini-2.0-flash',
                     system_instruction=combined_instruction
                 )
                 
@@ -129,10 +129,10 @@ class FlamingDeathBot(commands.Bot):
                 print(f"Error on current API key: {error_str}")
                 
                 if "429" in error_str or "quota" in error_str.lower() or "resource_exhausted" in error_str.lower():
-                    print("⚠️ Quota hit. Attempting fallback to gemini-2.5-flash-lite...")
+                    print("⚠️ Quota hit. Attempting fallback to gemini-2.0-flash-lite...")
                     try:
                         lite_model = genai.GenerativeModel(
-                            model_name='gemini-2.5-flash-lite',
+                            model_name='gemini-2.0-flash-lite',
                             system_instruction=combined_instruction
                         )
                         response = await asyncio.to_thread(
@@ -146,8 +146,8 @@ class FlamingDeathBot(commands.Bot):
                         print(f"Flash-Lite fallback failed on this key: {lite_err}. Trying next key...")
                         continue
                 else:
-                    # Break and return fallback message for non-quota errors
-                    break
+                    # Retry next key on non-quota errors as well
+                    continue
 
         return "*ROAARRR!* 🎙️ *My fiery broadcast is choked by static! Try again shortly!*"
 
@@ -242,4 +242,4 @@ async def on_message(message):
 
 if __name__ == "__main__":
     bot.run(DISCORD_TOKEN)
-                
+               
