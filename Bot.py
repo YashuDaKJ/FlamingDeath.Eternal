@@ -107,47 +107,36 @@ class FlamingDeathBot(commands.Bot):
         keys_to_try = API_KEYS.copy()
         random.shuffle(keys_to_try)
 
-        for key in keys_to_try:
-            try:
-                genai.configure(api_key=key)
-                model = genai.GenerativeModel(
-                    model_name='gemini-2.0-flash',
-                    system_instruction=combined_instruction
-                )
-                
-                response = await asyncio.to_thread(
-                    model.generate_content, contents_payload
-                )
-                assistant_message = response.text
-                
-                if not attachment_data:
-                    self.conversation_history[user_id].append({"role": "model", "parts": [assistant_message]})
-                return assistant_message
+        # Fallback hierarchy across model tiers
+        models_to_try = ['gemini-2.0-flash', 'gemini-2.0-flash-lite', 'gemini-1.5-flash']
 
-            except Exception as e:
-                error_str = str(e)
-                print(f"Error on current API key: {error_str}")
-                
-                if "429" in error_str or "quota" in error_str.lower() or "resource_exhausted" in error_str.lower():
-                    print("⚠️ Quota hit. Attempting fallback to gemini-2.0-flash-lite...")
-                    try:
-                        lite_model = genai.GenerativeModel(
-                            model_name='gemini-2.0-flash-lite',
-                            system_instruction=combined_instruction
-                        )
-                        response = await asyncio.to_thread(
-                            lite_model.generate_content, contents_payload
-                        )
-                        assistant_message = response.text
-                        if not attachment_data:
-                            self.conversation_history[user_id].append({"role": "model", "parts": [assistant_message]})
-                        return assistant_message
-                    except Exception as lite_err:
-                        print(f"Flash-Lite fallback failed on this key: {lite_err}. Trying next key...")
+        for key in keys_to_try:
+            genai.configure(api_key=key)
+            for model_name in models_to_try:
+                try:
+                    model = genai.GenerativeModel(
+                        model_name=model_name,
+                        system_instruction=combined_instruction
+                    )
+                    
+                    response = await asyncio.to_thread(
+                        model.generate_content, contents_payload
+                    )
+                    assistant_message = response.text
+                    
+                    if not attachment_data:
+                        self.conversation_history[user_id].append({"role": "model", "parts": [assistant_message]})
+                    return assistant_message
+
+                except Exception as e:
+                    error_str = str(e)
+                    print(f"Error on key with model {model_name}: {error_str}")
+                    
+                    if "429" in error_str or "quota" in error_str.lower() or "resource_exhausted" in error_str.lower():
+                        await asyncio.sleep(1)  # Cooldown before trying next model/key
                         continue
-                else:
-                    # Retry next key on non-quota errors as well
-                    continue
+                    else:
+                        break  # Non-quota error, move to next key
 
         return "*ROAARRR!* 🎙️ *My fiery broadcast is choked by static! Try again shortly!*"
 
@@ -242,4 +231,4 @@ async def on_message(message):
 
 if __name__ == "__main__":
     bot.run(DISCORD_TOKEN)
-               
+    
