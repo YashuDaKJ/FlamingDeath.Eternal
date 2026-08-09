@@ -108,7 +108,7 @@ class FlamingDeathBot(commands.Bot):
         random.shuffle(keys_to_try)
 
         # Fallback hierarchy across model tiers
-        models_to_try = ['gemini-2.0-flash', 'gemini-2.0-flash-lite', 'gemini-1.5-flash']
+        models_to_try = ['gemini-2.5-flash', 'gemini-2.5-flash', 'gemini-2.5-flash']
 
         for key in keys_to_try:
             genai.configure(api_key=key)
