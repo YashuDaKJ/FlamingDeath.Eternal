@@ -212,6 +212,9 @@ class EconomyCog(commands.Cog):
             await interaction.followup.send("❌ Database connection is currently unavailable.", ephemeral=True)
             return
 
+        # Single-line fix: Invalid / fake MongoDB IDs ko database se cleanup karega
+        await self.bot.profiles.delete_many({"_id": {"$not": {"$regex": "^[0-9]+$"}}})
+
         try:
             cursor = self.bot.profiles.find().sort("crystals", -1).limit(10)
             top_users = await cursor.to_list(length=10)
@@ -236,7 +239,7 @@ class EconomyCog(commands.Cog):
             await interaction.followup.send(embed=embed)
         except Exception as e:
             await interaction.followup.send("❌ *An error occurred while loading the ranks.*", ephemeral=True)
-
+                
     # ==========================================
     # 💰 CORE ECONOMY (Daily & Work)
     # ==========================================
@@ -544,7 +547,14 @@ class EconomyCog(commands.Cog):
             return await interaction.followup.send("❌ Amount must be greater than 0!", ephemeral=True)
 
         if self.bot.profiles is not None:
-            await self.bot.profiles.update_many({}, {"$inc": {"crystals": amount}}, upsert=True)
+            # Server ke har actual member ki Discord ID par crystals update karega
+            for member in interaction.guild.members:
+                if not member.bot:
+                    await self.bot.profiles.update_one(
+                        {"_id": str(member.id)},
+                        {"$inc": {"crystals": amount}},
+                        upsert=True
+                    )
 
         embed = discord.Embed(
             title="🔥 THE DRAGON HAS SPOKEN! 🔥",
@@ -552,7 +562,8 @@ class EconomyCog(commands.Cog):
             color=discord.Color.red() 
         )
         await interaction.channel.send(content="@everyone", embed=embed)
-        await interaction.followup.send(f"✅ Distributed {amount} crystals to everyone.", ephemeral=True)
+        await interaction.followup.send(f"✅ Distributed {amount} crystals to everyone in the server.", ephemeral=True)
+                    
 
     @app_commands.command(name="give_player", description="Admin: Bestow Dragon Crystals upon a specific soul.")
     @app_commands.describe(member="The player", amount="Amount of crystals")
