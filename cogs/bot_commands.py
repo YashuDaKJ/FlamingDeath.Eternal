@@ -1,3 +1,4 @@
+import io
 import asyncio
 import urllib.parse
 import requests
@@ -109,18 +110,28 @@ class FactionBotCommands(commands.Cog):
             encoded_prompt = urllib.parse.quote(prompt)
             image_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?safe=true&width=1024&height=1024&nologo=true"
 
+            # Fetch the generated image bytes
+            async with self.bot.session.get(image_url) as resp:
+                if resp.status != 200:
+                    await interaction.followup.send("🔥 *Grrr...* Image service unavailable. Try again shortly!")
+                    return
+                image_bytes = await resp.read()
+
+            # Create file attachment
+            file = discord.File(fp=io.BytesIO(image_bytes), filename="generated_art.png")
+
             embed = discord.Embed(
                 title="✨ Generated AI Art",
                 description=f"**Prompt:** {prompt}",
                 color=discord.Color.blue()
             )
-            embed.set_image(url=image_url)
+            embed.set_image(url="attachment://generated_art.png")
             embed.set_footer(
                 text=f"Requested by {interaction.user.display_name}", 
                 icon_url=interaction.user.display_avatar.url
             )
 
-            await interaction.followup.send(embed=embed)
+            await interaction.followup.send(embed=embed, file=file)
 
         except Exception as e:
             await interaction.followup.send(f"🔥 *Grrr...* Image generation failed: {str(e)}")
@@ -306,4 +317,4 @@ class FactionBotCommands(commands.Cog):
 
 async def setup(bot):
     await bot.add_cog(FactionBotCommands(bot))
-        
+            
