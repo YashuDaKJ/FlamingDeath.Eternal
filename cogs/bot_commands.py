@@ -1,4 +1,5 @@
 import asyncio
+import urllib.parse
 import requests
 from bs4 import BeautifulSoup
 
@@ -33,7 +34,7 @@ class HelpDropdown(discord.ui.Select):
     def __init__(self):
         options = [
             discord.SelectOption(label="General Commands", description="Basic chat and utility features", emoji="🐉"),
-            discord.SelectOption(label="AI Multimedia", description="Vision features", emoji="🎨"),
+            discord.SelectOption(label="AI Multimedia", description="Vision and Image Generation features", emoji="🎨"),
             discord.SelectOption(label="Faction Games & RPG", description="Play games and earn crystals", emoji="⚔️")
         ]
         super().__init__(placeholder="Choose a category...", min_values=1, max_values=1, options=options)
@@ -51,6 +52,7 @@ class HelpDropdown(discord.ui.Select):
             await interaction.response.edit_message(embed=embed)
         elif self.values[0] == "AI Multimedia":
             embed = discord.Embed(title="🎨 AI Multimedia Commands", color=discord.Color.teal())
+            embed.add_field(name="`/imagine`", value="Generate AI images instantly using Pollinations.ai!", inline=False)
             embed.add_field(name="`/analyze`", value="Upload an image, video, or audio file for Dragon Vision!", inline=False)
             await interaction.response.edit_message(embed=embed)
         elif self.values[0] == "Faction Games & RPG":
@@ -70,6 +72,7 @@ class HelpView(discord.ui.View):
 class FactionBotCommands(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
+        self.banned_words = ["nsfw", "nude", "blood", "gore", "explicit"]
 
     @app_commands.command(name='ping', description="Check the operational response latency matrix")
     async def ping(self, interaction: discord.Interaction):
@@ -85,6 +88,42 @@ class FactionBotCommands(commands.Cog):
         )
         embed.set_footer(text="Guarding Eternal since 2025")
         await interaction.response.send_message(embed=embed, view=HelpView(), ephemeral=False)
+
+    @app_commands.command(name="imagine", description="Generate an AI image using Pollinations.ai")
+    @app_commands.describe(prompt="Describe the image you want to create")
+    @app_commands.checks.cooldown(1, 5.0, key=lambda i: i.user.id)
+    async def imagine(self, interaction: discord.Interaction, prompt: str):
+        # Basic Moderation Check
+        prompt_lower = prompt.lower()
+        if any(word in prompt_lower for word in self.banned_words):
+            await interaction.response.send_message(
+                "🚫 *This prompt contains restricted terms. Please keep it clean!*", 
+                ephemeral=True
+            )
+            return
+
+        await interaction.response.defer()
+
+        try:
+            # Encode prompt for web URL
+            encoded_prompt = urllib.parse.quote(prompt)
+            image_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?safe=true&width=1024&height=1024&nologo=true"
+
+            embed = discord.Embed(
+                title="✨ Generated AI Art",
+                description=f"**Prompt:** {prompt}",
+                color=discord.Color.blue()
+            )
+            embed.set_image(url=image_url)
+            embed.set_footer(
+                text=f"Requested by {interaction.user.display_name}", 
+                icon_url=interaction.user.display_avatar.url
+            )
+
+            await interaction.followup.send(embed=embed)
+
+        except Exception as e:
+            await interaction.followup.send(f"🔥 *Grrr...* Image generation failed: {str(e)}")
 
     @app_commands.command(name="ask", description="Ask FlamingDeath anything, anywhere!")
     @app_commands.checks.cooldown(1, 5.0, key=lambda i: i.user.id)
@@ -166,9 +205,6 @@ class FactionBotCommands(commands.Cog):
             else:
                 await interaction.followup.send(f"🔥 Web read error: {str(e)}")
 
-    # ----------------------------------------------------
-    # UPDATED COPY COMMAND
-    # ----------------------------------------------------
     @app_commands.command(name="copy", description="Copy a message, send text, or reply to a message anonymously (Admin Only)")
     @app_commands.describe(
         message_input="Enter raw text to send OR a Message ID to target",
@@ -255,6 +291,7 @@ class FactionBotCommands(commands.Cog):
         except Exception as e:
             await interaction.followup.send(f"🔥 Error: {str(e)}")
 
+    @imagine.error
     @ask.error
     @readweb.error
     @analyze.error
