@@ -4,7 +4,7 @@
   
 # 🔥 FlamingDeath — Faction Gamification & AI Intelligence Core
 
-**FlamingDeath** serves as the dynamic interactive intelligence, RPG gamification engine, and co-guardian of the **Eternal** faction ecosystem. Built on asynchronous Python and `discord.py`, it integrates **Gemini 2.5 Flash** to power conversational AI, multi-modal media analysis, shared faction memory, and a custom economy system.
+**FlamingDeath** serves as the dynamic interactive intelligence, RPG gamification engine, and co-guardian of the **Eternal** faction ecosystem. Built on asynchronous Python and `discord.py`, it integrates **Gemini 2.5 Flash** to power conversational AI, multi-modal media analysis, shared faction memory, and a custom interactive economy system.
 
 ---
 
@@ -13,9 +13,9 @@
 * **Dragon AI Persona Matrix:** Powered by Gemini 2.5 Flash with custom system directives, enabling context-aware responses and continuous chat history retention.
 * **Shared Faction Memory (Atlas Core):** Allows high keepers to dynamically store (`/remember`) and retrieve (`/recall`) critical faction intelligence in real-time.
 * **Multi-Modal Vision & Web Reader Engine:** Direct analysis of uploaded images, audio, and video files, alongside web scraping capabilities (`/readweb`) with automated AI summaries.
-* **Gamified Economy System:** Fully integrated RPG loop featuring interactive journeys (`/play`), timed hunting expeditions, gambling risk vectors, and custom member profile cards.
-* **Stealth Admin Commands:** Secret administrative tools allowing high keepers to distribute rewards (`/give_player`, `/give_everyone`) publicly attributed to FlamingDeath while hiding user execution.
-* **24/7 Cloud Resilience:** Built-in Flask web server with background self-ping heartbeat threads to maintain active uptime on deployment platforms (e.g., Render).
+* **Interactive Oracle Control Panel:** Integrated UI dropdown menus (`/flamy-oracle`) and button routing systems for effortless, click-based command access.
+* **Gamified Economy System:** Fully integrated RPG loop featuring daily rations (`/daily`), faction work quests (`/work`), high-risk crimes (`/crime`), slots mini-games, and custom member profile cards.
+* **Stealth Admin Commands:** Secret administrative tools allowing high keepers to manipulate messages (`/copy`) and distribute rewards publicly attributed to FlamingDeath while hiding user execution.
 
 ---
 
@@ -35,20 +35,19 @@
 ### 🎨 AI Multimedia & Vision
 | Command | Parameters | Auth / Limits | Description |
 | :--- | :--- | :--- | :--- |
+| `/imagine` | `prompt` | 5s Cooldown | Generates AI images instantly using Pollinations.ai. |
 | `/analyze` | `prompt`, `attachment` | 10s Cooldown | Executes multi-modal visual and audio analysis on uploaded media files. |
 
 ### ⚔️ Faction RPG & Crystal Economy
 | Command | Parameters | Cooldown / Cost | Description |
 | :--- | :--- | :--- | :--- |
+| `/flamy-oracle` | None | None | Deploys the main interactive UI control dashboard with dynamic buttons and dropdowns. |
 | `/profile` | None | None | Retrieves your Eternal member card, join date, and active Crystal balance. |
 | `/leaderboard` | None | None | Displays top Dragon Crystal hoarders across the Eternal faction. |
-| `/play` | None | 1 Hour Cooldown | Embark on interactive journeys (Caverns, Ruins, Wilderness) to harvest crystals. |
-| `/hunt` | None | 1 Hour Cooldown | Dispatches a scouting array into the wild to harvest Dragon Crystals. |
-| `/coinflip` | `choice`, `bet` | None | Wagers active Dragon Crystals on a high-stakes probability toss. |
+| `/daily` | None | 24 Hours Cooldown | Claims daily faction rations and maintains active streak multipliers. |
+| `/work` | None | 10 Mins Cooldown | Completes faction tasks to earn Dragon Crystals. |
+| `/crime` | None | 45 Mins Cooldown | Attempts high-risk/high-payout crimes with crystal fine risks. |
 | `/slots` | None | 10 Crystals | Triggers the Dragon Slot Machine for randomized payout multipliers. |
-| `/give_player` | `member`, `amount` | Admin Only (Stealth) | Publicly bestows Dragon Crystals on a target user in FlamingDeath's name while hiding admin execution. |
-| `/give_everyone` | `amount` | Admin Only (Stealth) | Publicly bestows Dragon Crystals on all members in FlamingDeath's name while hiding admin execution. |
-| `/give_role` | `role`, `amount` | Admin Only | Distributes Dragon Crystals to all members holding a specified role. |
 
 ---
 
