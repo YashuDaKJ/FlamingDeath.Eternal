@@ -305,6 +305,78 @@ class EconomyCog(commands.Cog):
         except Exception:
             await interaction.followup.send("❌ *An error occurred while loading the ranks.*", ephemeral=True)
 
+    # ==========================================
+    # MARKET / SHOP SYSTEM
+    # ==========================================
+    
+    @app_commands.command(name="shop", description="Browse items and perks available in the Eternal Market")
+    async def shop(self, interaction: discord.Interaction):
+        await interaction.response.defer()
+        
+        embed = discord.Embed(
+            title="🛒 Eternal Faction Market",
+            description="Use `/buy <item_id>` to purchase items using your Dragon Crystals!",
+            color=discord.Color.gold()
+        )
+        embed.add_field(
+            name="1. 🛡️ Dragon Guard Role (`guard`)",
+            value="Price: ✨ **500 Crystals**\n*Claim the honorable Dragon Guard rank in the server.*",
+            inline=False
+        )
+        embed.add_field(
+            name="2. 🔥 Flame Aura Role (`aura`)",
+            value="Price: ✨ **1,500 Crystals**\n*Show off a glowing fiery title in member lists.*",
+            inline=False
+        )
+        embed.add_field(
+            name="3. ⚡ Double XP Boost (`xpboost`)",
+            value="Price: ✨ **800 Crystals**\n*Receive a temporary XP multiplier for faction activities.*",
+            inline=False
+        )
+        
+        await interaction.followup.send(embed=embed)
+
+    @app_commands.command(name="buy", description="Purchase an item from the Eternal shop")
+    @app_commands.describe(item_id="The ID of the item you want to buy (e.g., guard, aura, xpboost)")
+    async def buy(self, interaction: discord.Interaction, item_id: str):
+        await interaction.response.defer()
+        
+        items_catalog = {
+            "guard": {"name": "Dragon Guard Role", "price": 500},
+            "aura": {"name": "Flame Aura Role", "price": 1500},
+            "xpboost": {"name": "Double XP Boost", "price": 800}
+        }
+        
+        key = item_id.lower().strip()
+        if key not in items_catalog:
+            await interaction.followup.send("❌ Item not found! Use `/shop` to view valid item IDs.")
+            return
+
+        item = items_catalog[key]
+        user_id = interaction.user.id
+        profile = await self._get_or_create_profile(user_id)
+        
+        if profile.get("crystals", 0) < item["price"]:
+            await interaction.followup.send(f"❌ You need ✨ **{item['price']} Crystals** to buy `{item['name']}`, but you only have ✨ `{profile.get('crystals', 0)}`.")
+            return
+
+        if self.bot.profiles is not None:
+            await self.bot.profiles.update_one(
+                {"_id": str(user_id)},
+                {
+                    "$inc": {"crystals": -item["price"]},
+                    "$push": {"inventory": item["name"]}
+                },
+                upsert=True
+            )
+
+        embed = discord.Embed(
+            title="🎉 Purchase Successful!",
+            description=f"You bought **{item['name']}** for ✨ **{item['price']} Crystals**!\nCheck your collection anytime with `/inventory`.",
+            color=discord.Color.green()
+        )
+        await interaction.followup.send(embed=embed)
+        
 async def setup(bot):
     await bot.add_cog(EconomyCog(bot))
         
