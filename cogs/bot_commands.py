@@ -1,7 +1,6 @@
 import io
 import asyncio
 import urllib.parse
-import requests
 from bs4 import BeautifulSoup
 
 import discord
@@ -12,24 +11,6 @@ import faction_data
 
 SPECIAL_CHANNEL_ID = 1521899264265945109
 ADMIN_IDS = [1477528681709830297]
-
-def fetch_web_content(url):
-    try:
-        headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
-        response = requests.get(url, headers=headers, timeout=10)
-        if response.status_code != 200:
-            return "Error: Website could not be reached."
-            
-        soup = BeautifulSoup(response.text, 'html.parser')
-        for script in soup(["script", "style"]): 
-            script.extract()
-            
-        text = soup.get_text()
-        lines = (line.strip() for line in text.splitlines())
-        clean_text = '\n'.join(chunk for chunk in lines if chunk)
-        return clean_text[:1500]
-    except Exception as e:
-        return f"Error: {str(e)}"
 
 class HelpDropdown(discord.ui.Select):
     def __init__(self):
@@ -43,37 +24,60 @@ class HelpDropdown(discord.ui.Select):
     async def callback(self, interaction: discord.Interaction):
         if self.values[0] == "General Commands":
             embed = discord.Embed(title="🐉 General Commands", color=discord.Color.blue())
-            embed.add_field(name="`/ping`", value="Check the bot's speed.", inline=False)
+            embed.add_field(name="`/ping`", value="Check the bot's latency matrix.", inline=False)
             embed.add_field(name="`/ask`", value="Ask FlamingDeath a question.", inline=False)
-            embed.add_field(name="`/copy`", value="Copy/Echo a message, reply, or send files.", inline=False)
+            embed.add_field(name="`/copy`", value="Copy/Echo a message or send secret text (Admin).", inline=False)
             embed.add_field(name="`/remember`", value="Save faction info to the database.", inline=False)
             embed.add_field(name="`/recall`", value="Recall remembered info.", inline=False)
             embed.add_field(name="`/readweb`", value="Summarize web page content.", inline=False)
             embed.add_field(name="💬 Chat Mode", value=f"Talk directly in <#{SPECIAL_CHANNEL_ID}> without pings!", inline=False)
             await interaction.response.edit_message(embed=embed)
+
         elif self.values[0] == "AI Multimedia":
             embed = discord.Embed(title="🎨 AI Multimedia Commands", color=discord.Color.teal())
             embed.add_field(name="`/imagine`", value="Generate AI images instantly using Pollinations.ai!", inline=False)
             embed.add_field(name="`/analyze`", value="Upload an image, video, or audio file for Dragon Vision!", inline=False)
             await interaction.response.edit_message(embed=embed)
+
         elif self.values[0] == "Faction Games & RPG":
             embed = discord.Embed(title="⚔️ Faction Games & Economy System", color=discord.Color.dark_red())
-            embed.add_field(name="`/profile`", value="View your member card and Crystal balance.", inline=False)
-            embed.add_field(name="`/play`", value="Embark on interactive journeys to hunt for Crystals (1h cooldown).", inline=False)
-            embed.add_field(name="`/hunt`", value="Hunt for Dragon Crystals (1h cooldown).", inline=False)
-            embed.add_field(name="`/coinflip`", value="Bet crystals on Heads or Tails!", inline=False)
-            embed.add_field(name="`/slots`", value="Try your luck on the Dragon Slot Machine (Cost: 10 Crystals).", inline=False)
+            embed.add_field(name="`/flamy-oracle`", value="Interactive Faction Control Panel & Dashboard.", inline=False)
+            embed.add_field(name="`/profile`", value="View your Eternal member card and Crystal balance.", inline=False)
+            embed.add_field(name="`/daily`", value="Claim daily faction rations & streak crystals.", inline=False)
+            embed.add_field(name="`/work`", value="Complete faction tasks for crystals.", inline=False)
+            embed.add_field(name="`/crime`", value="Attempt high-risk crimes for big crystal rewards.", inline=False)
+            embed.add_field(name="`/slots`", value="Try your luck on the Dragon Slot Machine.", inline=False)
+            embed.add_field(name="`/leaderboard`", value="View top crystal hoarders in the faction.", inline=False)
             await interaction.response.edit_message(embed=embed)
 
 class HelpView(discord.ui.View):
     def __init__(self):
-        super().__init__()
+        super().__init__(timeout=180)
         self.add_item(HelpDropdown())
 
 class FactionBotCommands(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.banned_words = ["nsfw", "nude", "blood", "gore", "explicit"]
+
+    async def _async_fetch_web_content(self, url: str) -> str:
+        try:
+            headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
+            async with self.bot.session.get(url, headers=headers, timeout=10) as resp:
+                if resp.status != 200:
+                    return "Error: Website could not be reached."
+                html_text = await resp.text()
+
+            soup = BeautifulSoup(html_text, 'html.parser')
+            for script in soup(["script", "style"]): 
+                script.extract()
+                
+            text = soup.get_text()
+            lines = (line.strip() for line in text.splitlines())
+            clean_text = '\n'.join(chunk for chunk in lines if chunk)
+            return clean_text[:1500]
+        except Exception as e:
+            return f"Error: {str(e)}"
 
     @app_commands.command(name='ping', description="Check the operational response latency matrix")
     async def ping(self, interaction: discord.Interaction):
@@ -87,14 +91,13 @@ class FactionBotCommands(commands.Cog):
             description="Welcome, Eternal member! Select a category from the menu below.", 
             color=discord.Color.teal()
         )
-        embed.set_footer(text="Guarding Eternal since 2025")
+        embed.set_footer(text="Guarding Eternal Faction")
         await interaction.response.send_message(embed=embed, view=HelpView(), ephemeral=False)
 
     @app_commands.command(name="imagine", description="Generate an AI image using Pollinations.ai")
     @app_commands.describe(prompt="Describe the image you want to create")
     @app_commands.checks.cooldown(1, 5.0, key=lambda i: i.user.id)
     async def imagine(self, interaction: discord.Interaction, prompt: str):
-        # Basic Moderation Check
         prompt_lower = prompt.lower()
         if any(word in prompt_lower for word in self.banned_words):
             await interaction.response.send_message(
@@ -106,18 +109,15 @@ class FactionBotCommands(commands.Cog):
         await interaction.response.defer()
 
         try:
-            # Encode prompt for web URL
             encoded_prompt = urllib.parse.quote(prompt)
             image_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?safe=true&width=1024&height=1024&nologo=true"
 
-            # Fetch the generated image bytes
             async with self.bot.session.get(image_url) as resp:
                 if resp.status != 200:
                     await interaction.followup.send("🔥 *Grrr...* Image service unavailable. Try again shortly!")
                     return
                 image_bytes = await resp.read()
 
-            # Create file attachment
             file = discord.File(fp=io.BytesIO(image_bytes), filename="generated_art.png")
 
             embed = discord.Embed(
@@ -156,14 +156,14 @@ class FactionBotCommands(commands.Cog):
                 await interaction.followup.send(formatted_response)
         except Exception as e:
             if "429" in str(e) or "quota" in str(e).lower():
-                await interaction.followup.send("🔥 *ROAARRR!* Fiery broadcast choked by static! Try again shortly!")
+                await interaction.followup.send("🔥 *ROAARRR!* Rate limit hit! Try again shortly!")
             else:
                 await interaction.followup.send(f"🔥 *Grrr...* Error: {str(e)}")
 
     @app_commands.command(name="remember", description="Make the Dragon remember a faction detail or rule")
     async def remember(self, interaction: discord.Interaction, topic: str, information: str):
         await interaction.response.defer()
-        if self.bot.db:
+        if self.bot.db is not None:
             memory_coll = self.bot.db["faction_shared_memory"]
             await memory_coll.update_one(
                 {"_id": topic.lower().strip()},
@@ -178,7 +178,7 @@ class FactionBotCommands(commands.Cog):
     async def recall(self, interaction: discord.Interaction, topic: str):
         await interaction.response.defer()
         info = None
-        if self.bot.db:
+        if self.bot.db is not None:
             memory_coll = self.bot.db["faction_shared_memory"]
             doc = await memory_coll.find_one({"_id": topic.lower().strip()})
             if doc:
@@ -194,7 +194,7 @@ class FactionBotCommands(commands.Cog):
     async def readweb(self, interaction: discord.Interaction, url: str):
         await interaction.response.defer()
         
-        web_raw_data = await asyncio.to_thread(fetch_web_content, url)
+        web_raw_data = await self._async_fetch_web_content(url)
         
         if "Error:" in web_raw_data:
             await interaction.followup.send(f"🔥 {web_raw_data}")
@@ -216,12 +216,7 @@ class FactionBotCommands(commands.Cog):
             else:
                 await interaction.followup.send(f"🔥 Web read error: {str(e)}")
 
-    @app_commands.command(name="copy", description="Copy a message, send text, or reply to a message anonymously (Admin Only)")
-    @app_commands.describe(
-        message_input="Enter raw text to send OR a Message ID to target",
-        reply_text="Optional text to reply directly to the target Message ID",
-        target_channel="The channel where the message should be sent (Optional)"
-    )
+    @app_commands.command(name="copy", description="Copy a message, send text, or reply anonymously (Admin Only)")
     async def copy(
         self, 
         interaction: discord.Interaction, 
@@ -234,7 +229,6 @@ class FactionBotCommands(commands.Cog):
             return
 
         await interaction.response.defer(ephemeral=True)
-        
         destination = target_channel or interaction.channel
 
         try:
@@ -244,15 +238,9 @@ class FactionBotCommands(commands.Cog):
                 
                 if reply_text:
                     await original_msg.reply(reply_text)
-                    await interaction.followup.send(
-                        f"🤫 **Secret Output:** Replied to message `{msg_id}` in {interaction.channel.mention}!", 
-                        ephemeral=True
-                    )
+                    await interaction.followup.send(f"🤫 **Secret Output:** Replied to message `{msg_id}` in {interaction.channel.mention}!", ephemeral=True)
                 else:
-                    files = []
-                    for attachment in original_msg.attachments:
-                        files.append(await attachment.to_file())
-                    
+                    files = [await attachment.to_file() for attachment in original_msg.attachments]
                     new_msg = await destination.send(content=original_msg.content, files=files)
                     
                     for reaction in original_msg.reactions:
@@ -261,21 +249,15 @@ class FactionBotCommands(commands.Cog):
                         except discord.HTTPException:
                             pass
                     
-                    await interaction.followup.send(
-                        f"🤫 **Secret Output:** Cloned message `{msg_id}` (including attachments and reactions) to {destination.mention}!", 
-                        ephemeral=True
-                    )
+                    await interaction.followup.send(f"🤫 **Secret Output:** Cloned message `{msg_id}` to {destination.mention}!", ephemeral=True)
             else:
                 await destination.send(content=message_input)
-                await interaction.followup.send(
-                    f"🤫 **Secret Output:** Dispatched text directly to {destination.mention}!", 
-                    ephemeral=True
-                )
+                await interaction.followup.send(f"🤫 **Secret Output:** Dispatched text directly to {destination.mention}!", ephemeral=True)
 
         except discord.NotFound:
             await interaction.followup.send(f"❌ Could not find message ID `{message_input}` in this channel.", ephemeral=True)
         except discord.Forbidden:
-            await interaction.followup.send(f"❌ I lack permission to send messages or add reactions in {destination.mention}.", ephemeral=True)
+            await interaction.followup.send(f"❌ I lack permission to send messages in {destination.mention}.", ephemeral=True)
         except Exception as e:
             await interaction.followup.send(f"❌ Copy execution error: {str(e)}", ephemeral=True)
 
@@ -288,17 +270,17 @@ class FactionBotCommands(commands.Cog):
             return
         try:
             attachment_data = None
-            if self.bot.session:
+            if hasattr(self.bot, 'session') and self.bot.session:
                 async with self.bot.session.get(attachment.url) as resp:
                     if resp.status == 200:
                         file_bytes = await resp.read()
                         attachment_data = {'mime_type': attachment.content_type, 'data': file_bytes}
             
-            if attachment_data:
+            if attachment_data and hasattr(self.bot, 'get_gemini_response'):
                 response_text = await self.bot.get_gemini_response(prompt, interaction.user.id, attachment_data)
                 await interaction.followup.send(f"🐉 **FlamingDeath Vision:** {response_text}")
             else:
-                await interaction.followup.send("🔥 Could not download attachment.")
+                await interaction.followup.send("🔥 Could not download attachment or Gemini handler missing.")
         except Exception as e:
             await interaction.followup.send(f"🔥 Error: {str(e)}")
 
@@ -317,4 +299,4 @@ class FactionBotCommands(commands.Cog):
 
 async def setup(bot):
     await bot.add_cog(FactionBotCommands(bot))
-            
+        
