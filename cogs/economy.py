@@ -61,7 +61,7 @@ class DynamicCategoryButtons(View):
             self.add_item(Button(label="Flamy Match", style=discord.ButtonStyle.success, custom_id="btn_match", emoji="💕"))
             self.add_item(Button(label="Quick Calc", style=discord.ButtonStyle.secondary, custom_id="btn_calc", emoji="🧮"))
 
-            class OracleSelect(Select):
+class OracleSelect(Select):
     def __init__(self):
         options = [
             discord.SelectOption(label="Treasury & Economy", emoji="💰", description="Gold, Vault, Market & Daily Loot"),
@@ -96,6 +96,7 @@ class DynamicCategoryButtons(View):
         view = DynamicCategoryButtons(category)
         await interaction.response.edit_message(embed=embed, view=view)
 
+    
 class OracleDashboardView(View):
     def __init__(self):
         super().__init__(timeout=180)
