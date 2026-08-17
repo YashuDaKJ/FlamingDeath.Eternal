@@ -277,7 +277,7 @@ class EconomyCog(commands.Cog):
                 await interaction.response.send_message("🧮 Crunch numbers using `/calc <expression>`!", ephemeral=True)
 
 @app_commands.command(name="profile", description="Check your Eternal faction member card")
-    async def profile(self, interaction: discord.Interaction):
+async def profile(self, interaction: discord.Interaction):
         await interaction.response.defer()
         user = interaction.user
         joined_at = user.joined_at.strftime("%Y-%m-%d") if user.joined_at else "Unknown"
