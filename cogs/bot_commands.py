@@ -60,6 +60,21 @@ class FactionBotCommands(commands.Cog):
         self.bot = bot
         self.banned_words = ["nsfw", "nude", "blood", "gore", "explicit"]
 
+    @commands.Cog.listener()
+    async def on_message(self, message: discord.Message):
+        if message.author.bot:
+            return
+
+        # Case-insensitive trigger for prefix help command
+        if message.content.lower().strip() == "!flamy help":
+            embed = discord.Embed(
+                title="🔥 FlamingDeath Command Center 🔥", 
+                description="Welcome, Eternal member! Select a category from the menu below.", 
+                color=discord.Color.teal()
+            )
+            embed.set_footer(text="Guarding Eternal Faction")
+            await message.channel.send(embed=embed, view=HelpView())
+
     async def _async_fetch_web_content(self, url: str) -> str:
         try:
             headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
@@ -299,4 +314,4 @@ class FactionBotCommands(commands.Cog):
 
 async def setup(bot):
     await bot.add_cog(FactionBotCommands(bot))
-        
+            
