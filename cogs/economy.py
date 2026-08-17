@@ -982,8 +982,9 @@ class EconomyCog(commands.Cog):
             description=f"{interaction.user.mention} ❤️ {member.mention}\n\n**Compatibility: {percent}%**\n{verdict}",
             color=discord.Color.magenta()
         )
-        
-            _ALLOWED_OPERATORS = {
+        await interaction.response.send_message(embed=embed)
+
+    _ALLOWED_OPERATORS = {
         ast.Add: operator.add,
         ast.Sub: operator.sub,
         ast.Mult: operator.mul,
@@ -1022,3 +1023,4 @@ async def setup(bot):
     bot.tree.add_command(cog.vault_group)
     bot.tree.add_command(cog.rankroles_group)
     await bot.add_cog(cog)
+    
