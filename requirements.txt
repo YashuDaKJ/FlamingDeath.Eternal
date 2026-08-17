@@ -7,6 +7,6 @@ requests
 aiohttp
 pillow
 orjson
-pymongo[srv]
+pymongo
 motor
 certifi
