@@ -94,11 +94,6 @@ class FactionBotCommands(commands.Cog):
         except Exception as e:
             return f"Error: {str(e)}"
 
-    @app_commands.command(name='ping', description="Check the operational response latency matrix")
-    async def ping(self, interaction: discord.Interaction):
-        latency = round(self.bot.latency * 1000)
-        await interaction.response.send_message(f"*Grrr...* Pong! My flames reached you in {latency}ms!")
-
     @app_commands.command(name="help", description="Show all available features of FlamingDeath")
     async def help_command(self, interaction: discord.Interaction):
         embed = discord.Embed(
