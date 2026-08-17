@@ -1019,8 +1019,5 @@ class EconomyCog(commands.Cog):
             await interaction.response.send_message("❌ That doesn't look like a valid math expression. Try something like `(12 + 8) * 3 / 2`.", ephemeral=True)
 
 async def setup(bot):
-    cog = EconomyCog(bot)
-    bot.tree.add_command(cog.vault_group)
-    bot.tree.add_command(cog.rankroles_group)
-    await bot.add_cog(cog)
+    await bot.add_cog(EconomyCog(bot))
     
