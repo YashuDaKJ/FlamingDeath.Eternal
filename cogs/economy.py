@@ -981,13 +981,8 @@ async def profile(self, interaction: discord.Interaction):
             description=f"{interaction.user.mention} ❤️ {member.mention}\n\n**Compatibility: {percent}%**\n{verdict}",
             color=discord.Color.magenta()
         )
-        await interaction.response.send_message(embed=embed)
-            title="💕 Flamy Match",
-            description=f"{interaction.user.mention} ❤️ {member.mention}\n\n**Compatibility: {percent}%**\n{verdict}",
-            color=discord.Color.magenta()
-        )
-        await interaction.response.send_message(embed=embed)
-_ALLOWED_OPERATORS = {
+        
+            _ALLOWED_OPERATORS = {
         ast.Add: operator.add,
         ast.Sub: operator.sub,
         ast.Mult: operator.mul,
