@@ -12,6 +12,11 @@ import faction_data
 SPECIAL_CHANNEL_ID = 1521899264265945109
 ADMIN_IDS = [1477528681709830297]
 
+# Standard Browser User-Agent to prevent Cloudflare/Render 403 & 5xx blocks
+DEFAULT_HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+}
+
 def build_help_embed() -> discord.Embed:
     embed = discord.Embed(
         title="🔥 FlamingDeath Command Center 🔥", 
@@ -84,8 +89,7 @@ class FactionBotCommands(commands.Cog):
 
     async def _async_fetch_web_content(self, url: str) -> str:
         try:
-            headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
-            async with self.bot.session.get(url, headers=headers, timeout=10) as resp:
+            async with self.bot.session.get(url, headers=DEFAULT_HEADERS, timeout=10) as resp:
                 if resp.status != 200:
                     return "Error: Website could not be reached."
                 html_text = await resp.text()
@@ -124,9 +128,10 @@ class FactionBotCommands(commands.Cog):
             encoded_prompt = urllib.parse.quote(prompt)
             image_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?safe=true&width=1024&height=1024&nologo=true"
 
-            async with self.bot.session.get(image_url) as resp:
+            # Custom Browser Headers added to bypass Cloudflare Blocks
+            async with self.bot.session.get(image_url, headers=DEFAULT_HEADERS, timeout=15) as resp:
                 if resp.status != 200:
-                    await interaction.followup.send("🔥 *Grrr...* Image service unavailable. Try again shortly!")
+                    await interaction.followup.send("🔥 *Grrr...* Cloudflare or Image service blocked the request. Try again shortly!")
                     return
                 image_bytes = await resp.read()
 
@@ -283,7 +288,7 @@ class FactionBotCommands(commands.Cog):
         try:
             attachment_data = None
             if hasattr(self.bot, 'session') and self.bot.session:
-                async with self.bot.session.get(attachment.url) as resp:
+                async with self.bot.session.get(attachment.url, headers=DEFAULT_HEADERS) as resp:
                     if resp.status == 200:
                         file_bytes = await resp.read()
                         attachment_data = {'mime_type': attachment.content_type, 'data': file_bytes}
