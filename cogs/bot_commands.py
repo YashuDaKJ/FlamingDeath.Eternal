@@ -12,48 +12,60 @@ import faction_data
 SPECIAL_CHANNEL_ID = 1521899264265945109
 ADMIN_IDS = [1477528681709830297]
 
-class HelpDropdown(discord.ui.Select):
-    def __init__(self):
-        options = [
-            discord.SelectOption(label="General Commands", description="Basic chat and utility features", emoji="🐉"),
-            discord.SelectOption(label="AI Multimedia", description="Vision and Image Generation features", emoji="🎨"),
-            discord.SelectOption(label="Faction Games & RPG", description="Play games and earn crystals", emoji="⚔️")
-        ]
-        super().__init__(placeholder="Choose a category...", min_values=1, max_values=1, options=options)
+def build_help_embed() -> discord.Embed:
+    embed = discord.Embed(
+        title="🔥 FlamingDeath Command Center 🔥", 
+        description="Welcome Eternal member! Here is the full list of operational commands:", 
+        color=discord.Color.teal()
+    )
 
-    async def callback(self, interaction: discord.Interaction):
-        if self.values[0] == "General Commands":
-            embed = discord.Embed(title="🐉 General Commands", color=discord.Color.blue())
-            embed.add_field(name="`/ping`", value="Check the bot's latency matrix.", inline=False)
-            embed.add_field(name="`/ask`", value="Ask FlamingDeath a question.", inline=False)
-            embed.add_field(name="`/copy`", value="Copy/Echo a message or send secret text (Admin).", inline=False)
-            embed.add_field(name="`/remember`", value="Save faction info to the database.", inline=False)
-            embed.add_field(name="`/recall`", value="Recall remembered info.", inline=False)
-            embed.add_field(name="`/readweb`", value="Summarize web page content.", inline=False)
-            embed.add_field(name="💬 Chat Mode", value=f"Talk directly in <#{SPECIAL_CHANNEL_ID}> without pings!", inline=False)
-            await interaction.response.edit_message(embed=embed)
+    # 1. General & Utility Commands
+    embed.add_field(
+        name="🐉 General & Utility Commands",
+        value=(
+            "`/ping` - Check latency matrix.\n"
+            "`/ask <question>` - Ask FlamingDeath anything.\n"
+            "`/copy` - Echo or send text anonymously (Admin).\n"
+            "`/remember <topic> <info>` - Save faction info to DB.\n"
+            "`/recall <topic>` - Recall saved faction info.\n"
+            "`/readweb <url>` - Summarize web page content.\n"
+            f"💬 **Chat Mode:** Talk directly in <#{SPECIAL_CHANNEL_ID}> without pings!"
+        ),
+        inline=False
+    )
 
-        elif self.values[0] == "AI Multimedia":
-            embed = discord.Embed(title="🎨 AI Multimedia Commands", color=discord.Color.teal())
-            embed.add_field(name="`/imagine`", value="Generate AI images instantly using Pollinations.ai!", inline=False)
-            embed.add_field(name="`/analyze`", value="Upload an image, video, or audio file for Dragon Vision!", inline=False)
-            await interaction.response.edit_message(embed=embed)
+    # 2. AI Multimedia Commands
+    embed.add_field(
+        name="🎨 AI & Vision Commands",
+        value=(
+            "`/imagine <prompt>` - Generate AI images via Pollinations.ai!\n"
+            "`/analyze <prompt> <attachment>` - Analyze images, videos, or audio."
+        ),
+        inline=False
+    )
 
-        elif self.values[0] == "Faction Games & RPG":
-            embed = discord.Embed(title="⚔️ Faction Games & Economy System", color=discord.Color.dark_red())
-            embed.add_field(name="`/flamy-oracle`", value="Interactive Faction Control Panel & Dashboard.", inline=False)
-            embed.add_field(name="`/profile`", value="View your Eternal member card and Crystal balance.", inline=False)
-            embed.add_field(name="`/daily`", value="Claim daily faction rations & streak crystals.", inline=False)
-            embed.add_field(name="`/work`", value="Complete faction tasks for crystals.", inline=False)
-            embed.add_field(name="`/crime`", value="Attempt high-risk crimes for big crystal rewards.", inline=False)
-            embed.add_field(name="`/slots`", value="Try your luck on the Dragon Slot Machine.", inline=False)
-            embed.add_field(name="`/leaderboard`", value="View top crystal hoarders in the faction.", inline=False)
-            await interaction.response.edit_message(embed=embed)
+    # 3. Economy & RPG Games
+    embed.add_field(
+        name="⚔️ RPG Games & Economy System",
+        value=(
+            "`/flamy-oracle` - Interactive Faction Dashboard.\n"
+            "`/profile [member]` - View Eternal member card & Crystals.\n"
+            "`/daily` - Claim daily rations & maintain streak.\n"
+            "`/work` - Complete faction tasks for Crystals.\n"
+            "`/crime` - Attempt high-risk raids for Crystals.\n"
+            "`/slots <bet>` - Play Dragon Slot Machine.\n"
+            "`/hunt` - Hunt beasts for rare crystal rewards.\n"
+            "`/coinflip <heads/tails> <bet>` - 50/50 crystal wager.\n"
+            "`/play` - Mini RPG challenges.\n"
+            "`/leaderboard` - Top crystal hoarders in the faction.\n"
+            "`/match <member>` - Test compatibility with a member.\n"
+            "`/calc <expr>` - Quick math calculator."
+        ),
+        inline=False
+    )
 
-class HelpView(discord.ui.View):
-    def __init__(self):
-        super().__init__(timeout=180)
-        self.add_item(HelpDropdown())
+    embed.set_footer(text="Guarding Eternal Faction | Type !flamy help anytime")
+    return embed
 
 class FactionBotCommands(commands.Cog):
     def __init__(self, bot):
@@ -65,15 +77,10 @@ class FactionBotCommands(commands.Cog):
         if message.author.bot:
             return
 
-        # Case-insensitive trigger for prefix help command
+        # Case-insensitive check for prefix help command
         if message.content.lower().strip() == "!flamy help":
-            embed = discord.Embed(
-                title="🔥 FlamingDeath Command Center 🔥", 
-                description="Welcome, Eternal member! Select a category from the menu below.", 
-                color=discord.Color.teal()
-            )
-            embed.set_footer(text="Guarding Eternal Faction")
-            await message.channel.send(embed=embed, view=HelpView())
+            embed = build_help_embed()
+            await message.channel.send(embed=embed)
 
     async def _async_fetch_web_content(self, url: str) -> str:
         try:
@@ -96,13 +103,8 @@ class FactionBotCommands(commands.Cog):
 
     @app_commands.command(name="help", description="Show all available features of FlamingDeath")
     async def help_command(self, interaction: discord.Interaction):
-        embed = discord.Embed(
-            title="🔥 FlamingDeath Command Center 🔥", 
-            description="Welcome, Eternal member! Select a category from the menu below.", 
-            color=discord.Color.teal()
-        )
-        embed.set_footer(text="Guarding Eternal Faction")
-        await interaction.response.send_message(embed=embed, view=HelpView(), ephemeral=False)
+        embed = build_help_embed()
+        await interaction.response.send_message(embed=embed, ephemeral=False)
 
     @app_commands.command(name="imagine", description="Generate an AI image using Pollinations.ai")
     @app_commands.describe(prompt="Describe the image you want to create")
