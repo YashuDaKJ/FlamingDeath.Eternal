@@ -14,6 +14,11 @@ import aiohttp
 
 import faction_data
 
+# Global Headers to Bypass Cloudflare/Render Bot Blockers
+DEFAULT_HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+}
+
 # --- Web Server Setup for 24/7 Hosting ---
 app = Flask('')
 
@@ -65,7 +70,6 @@ class FlamingDeathBot(commands.Bot):
             self.db = None
             self.profiles = None
         else:
-            # Added tlsCAFile to prevent SSL handshake issues on Linux deployment containers
             self.db_client = motor.motor_asyncio.AsyncIOMotorClient(
                 MONGO_URI, 
                 tlsCAFile=certifi.where()
@@ -75,8 +79,10 @@ class FlamingDeathBot(commands.Bot):
             print("🔥 MongoDB Atlas Pipeline: FlamingDeath connected successfully!")
 
     async def setup_hook(self):
-        """Load all cogs dynamically and initialize aiohttp session before login."""
-        self.session = aiohttp.ClientSession()
+        """Load all cogs dynamically and initialize aiohttp session with custom headers before login."""
+        # Fix 1: Pass Browser Headers globally to self.session
+        self.session = aiohttp.ClientSession(headers=DEFAULT_HEADERS)
+        
         await self.load_extension("cogs.bot_commands")
         await self.load_extension("cogs.economy")
         await self.load_extension("cogs.reaction")
@@ -107,8 +113,8 @@ class FlamingDeathBot(commands.Bot):
         keys_to_try = API_KEYS.copy()
         random.shuffle(keys_to_try)
 
-        # Fallback hierarchy across model tiers
-        models_to_try = ['gemini-2.5-flash', 'gemini-2.5-flash', 'gemini-2.5-flash']
+        # Fix 2: Updated model fallback list for stable API endpoints
+        models_to_try = ['gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-1.0-pro']
 
         for key in keys_to_try:
             genai.configure(api_key=key)
@@ -211,7 +217,7 @@ async def on_message(message):
                     try:
                         file_attachment = message.attachments[0]
                         if file_attachment.content_type:
-                            async with bot.session.get(file_attachment.url) as resp:
+                            async with bot.session.get(file_attachment.url, headers=DEFAULT_HEADERS) as resp:
                                 if resp.status == 200:
                                     file_bytes = await resp.read()
                                     attachment_data = {
@@ -231,4 +237,4 @@ async def on_message(message):
 
 if __name__ == "__main__":
     bot.run(DISCORD_TOKEN)
-    
+              
