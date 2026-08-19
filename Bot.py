@@ -9,6 +9,7 @@ from flask import Flask
 
 import discord
 from discord.ext import commands
+from discord import app_commands  # NAYA IMPORT: Error handler ke liye zaroori hai
 import google.generativeai as genai
 import motor.motor_asyncio
 import aiohttp
@@ -115,8 +116,8 @@ class FlamingDeathBot(commands.Bot):
         keys_to_try = API_KEYS.copy()
         random.shuffle(keys_to_try)
 
-        # Updated modern model names
-        models_to_try = ['gemini-2.5-flash', 'gemini-2.5-flash']
+        # ✅ NAYA CHANGE: Duplicate model hata diya gaya hai
+        models_to_try = ['gemini-2.5-flash']
 
         for key in keys_to_try:
             genai.configure(api_key=key)
@@ -159,6 +160,16 @@ async def on_ready():
         print(f"Synced {len(synced)} slash commands.")
     except Exception as e:
         print(f"Sync error: {e}")
+
+# ✅ NAYA CHANGE: Global Error Handler taaki 429 par bot crash na ho
+@bot.tree.error
+async def on_app_command_error(interaction: discord.Interaction, error: app_commands.AppCommandError):
+    if isinstance(error, app_commands.CommandInvokeError):
+        original = error.original
+        if hasattr(discord.errors, 'HTTPException') and isinstance(original, discord.errors.HTTPException) and original.status == 429:
+            print(f"⚠️ 429 Blocked on /{interaction.command.name}: Discord REST API rate limit (IP Block).")
+            return
+    print(f"❌ Command Error in /{interaction.command.name}: {error}")
 
 @bot.event
 async def on_message(message):
@@ -249,4 +260,4 @@ if __name__ == "__main__":
     except Exception as e:
         print(f"❌ LAUNCH CRASH: {e}")
         sys.exit(1)
-        
+    
