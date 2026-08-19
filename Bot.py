@@ -37,20 +37,18 @@ Thread(target=run_web_server, daemon=True).start()
 DISCORD_TOKEN = os.getenv('DISCORD_TOKEN')
 MONGO_URI = os.getenv('MONGO_URI')
 
-# Load all primary and fallback API keys
 API_KEYS = [
     os.getenv('GEMINI_API_KEY'),
     os.getenv('GEMINI_KEY_1'),
     os.getenv('GEMINI_KEY_2')
 ]
-# Filter out empty or missing keys
 API_KEYS = [k for k in API_KEYS if k]
 
 if not DISCORD_TOKEN:
     raise ValueError("DISCORD_TOKEN must be set!")
 
 if not API_KEYS:
-    raise ValueError("At least one GEMINI key (GEMINI_API_KEY, GEMINI_KEY_1, or GEMINI_KEY_2) must be set!")
+    raise ValueError("At least one GEMINI key must be set!")
 
 SPECIAL_CHANNEL_ID = 1521899264265945109
 
@@ -63,35 +61,41 @@ class FlamingDeathBot(commands.Bot):
         
         self.conversation_history = {}
         self.chat_cooldowns = {}
-        self.session = None  # Non-blocking HTTP session for downloading media
-        
-        if not MONGO_URI:
-            print("⚠️ WARNING: MONGO_URI missing! Database features will fail.")
-            self.db_client = None
-            self.db = None
-            self.profiles = None
-        else:
-            self.db_client = motor.motor_asyncio.AsyncIOMotorClient(
-                MONGO_URI, 
-                tlsCAFile=certifi.where()
-            )
-            self.db = self.db_client["eternal_faction_db"]
-            self.profiles = self.db["user_profiles"]
-            print("🔥 MongoDB Atlas Pipeline: FlamingDeath connected successfully!")
+        self.session = None
+        self.db_client = None
+        self.db = None
+        self.profiles = None
 
     async def setup_hook(self):
-        """Load all cogs dynamically and initialize aiohttp session with custom headers before login."""
+        """Initialize session, Mongo Async connection, and load cogs asynchronously."""
         self.session = aiohttp.ClientSession(headers=DEFAULT_HEADERS)
         
+        # Async MongoDB Initialization
+        if MONGO_URI:
+            try:
+                self.db_client = motor.motor_asyncio.AsyncIOMotorClient(
+                    MONGO_URI, 
+                    tlsCAFile=certifi.where()
+                )
+                self.db = self.db_client["eternal_faction_db"]
+                self.profiles = self.db["user_profiles"]
+                print("🔥 MongoDB Atlas Pipeline: FlamingDeath connected successfully!")
+            except Exception as e:
+                print(f"MongoDB Async Error: {e}")
+        else:
+            print("⚠️ WARNING: MONGO_URI missing!")
+
         await self.load_extension("cogs.bot_commands")
         await self.load_extension("cogs.economy")
         await self.load_extension("cogs.reaction")
         print("⚙️ All cogs loaded successfully.")
 
     async def close(self):
-        """Clean up HTTP session when bot shuts down."""
+        """Clean up HTTP session and Mongo Client when bot shuts down."""
         if self.session:
             await self.session.close()
+        if self.db_client:
+            self.db_client.close()
         await super().close()
 
     async def get_gemini_response(self, user_message: str, user_id: int, attachment_data=None) -> str:
@@ -100,7 +104,6 @@ class FlamingDeathBot(commands.Bot):
         
         combined_instruction = f"{faction_data.SYSTEM_PROMPT}\n\nAdditional Faction Information:\n{faction_data.FACTION_PROMPT}"
         
-        # Prepare context payload
         if attachment_data:
             contents_payload = [user_message, attachment_data]
         else:
@@ -109,11 +112,11 @@ class FlamingDeathBot(commands.Bot):
                 self.conversation_history[user_id] = self.conversation_history[user_id][-15:]
             contents_payload = self.conversation_history[user_id]
 
-        # Shuffle keys for load balancing
         keys_to_try = API_KEYS.copy()
         random.shuffle(keys_to_try)
 
-        models_to_try = ['gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-1.0-pro']
+        # Updated modern model names
+        models_to_try = ['gemini-2.5-flash', 'gemini-2.5-flash']
 
         for key in keys_to_try:
             genai.configure(api_key=key)
@@ -138,10 +141,10 @@ class FlamingDeathBot(commands.Bot):
                     print(f"Error on key with model {model_name}: {error_str}")
                     
                     if "429" in error_str or "quota" in error_str.lower() or "resource_exhausted" in error_str.lower():
-                        await asyncio.sleep(1)  # Cooldown before trying next model/key
+                        await asyncio.sleep(1)
                         continue
                     else:
-                        break  # Non-quota error, move to next key
+                        break
 
         return "*ROAARRR!* 🎙️ *My fiery broadcast is choked by static! Try again shortly!*"
 
@@ -149,7 +152,7 @@ bot = FlamingDeathBot()
 
 @bot.event
 async def on_ready():
-    print(f'{bot.user.name} is online!')
+    print(f'🔥 {bot.user.name} is online!')
     await bot.change_presence(activity=discord.Activity(type=discord.ActivityType.watching, name="over Eternal"))
     try:
         synced = await bot.tree.sync()
