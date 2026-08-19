@@ -9,7 +9,7 @@ from flask import Flask
 
 import discord
 from discord.ext import commands
-from discord import app_commands  # NAYA IMPORT: Error handler ke liye zaroori hai
+from discord import app_commands  # Required for the error handler
 import google.generativeai as genai
 import motor.motor_asyncio
 import aiohttp
@@ -116,7 +116,7 @@ class FlamingDeathBot(commands.Bot):
         keys_to_try = API_KEYS.copy()
         random.shuffle(keys_to_try)
 
-        # ✅ NAYA CHANGE: Duplicate model hata diya gaya hai
+        # Removed the duplicate model to prevent unnecessary retries
         models_to_try = ['gemini-2.5-flash']
 
         for key in keys_to_try:
@@ -155,13 +155,15 @@ bot = FlamingDeathBot()
 async def on_ready():
     print(f'🔥 {bot.user.name} is online!')
     await bot.change_presence(activity=discord.Activity(type=discord.ActivityType.watching, name="over Eternal"))
-    try:
-        synced = await bot.tree.sync()
-        print(f"Synced {len(synced)} slash commands.")
-    except Exception as e:
-        print(f"Sync error: {e}")
+    
+    # --- AUTO-SYNC DISABLED TO PREVENT 429 BOOT LOOP ---
+    # try:
+    #     synced = await bot.tree.sync()
+    #     print(f"Synced {len(synced)} slash commands.")
+    # except Exception as e:
+    #     print(f"Sync error: {e}")
 
-# ✅ NAYA CHANGE: Global Error Handler taaki 429 par bot crash na ho
+# Global Error Handler for Slash Commands to prevent crashes on 429s
 @bot.tree.error
 async def on_app_command_error(interaction: discord.Interaction, error: app_commands.AppCommandError):
     if isinstance(error, app_commands.CommandInvokeError):
@@ -260,4 +262,4 @@ if __name__ == "__main__":
     except Exception as e:
         print(f"❌ LAUNCH CRASH: {e}")
         sys.exit(1)
-    
+                                  
