@@ -10,3 +10,4 @@ orjson
 pymongo
 motor
 certifi
+gunicorn
