@@ -6,13 +6,11 @@ from bs4 import BeautifulSoup
 import discord
 from discord.ext import commands
 from discord import app_commands
-import google.generativeai as genai
 import faction_data
 
 SPECIAL_CHANNEL_ID = 1521899264265945109
 ADMIN_IDS = [1477528681709830297]
 
-# Standard Browser User-Agent to prevent Cloudflare/Render 403 & 5xx blocks
 DEFAULT_HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
 }
@@ -24,7 +22,6 @@ def build_help_embed() -> discord.Embed:
         color=discord.Color.teal()
     )
 
-    # 1. General & Utility Commands
     embed.add_field(
         name="🐉 General & Utility Commands",
         value=(
@@ -39,7 +36,6 @@ def build_help_embed() -> discord.Embed:
         inline=False
     )
 
-    # 2. AI Multimedia Commands
     embed.add_field(
         name="🎨 AI & Vision Commands",
         value=(
@@ -49,7 +45,6 @@ def build_help_embed() -> discord.Embed:
         inline=False
     )
 
-    # 3. Economy & RPG Games
     embed.add_field(
         name="⚔️ RPG Games & Economy System",
         value=(
@@ -82,7 +77,6 @@ class FactionBotCommands(commands.Cog):
         if message.author.bot:
             return
 
-        # Case-insensitive check for prefix help command
         if message.content.lower().strip() == "!flamy help":
             embed = build_help_embed()
             await message.channel.send(embed=embed)
@@ -128,7 +122,6 @@ class FactionBotCommands(commands.Cog):
             encoded_prompt = urllib.parse.quote(prompt)
             image_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?safe=true&width=1024&height=1024&nologo=true"
 
-            # Custom Browser Headers added to bypass Cloudflare Blocks
             async with self.bot.session.get(image_url, headers=DEFAULT_HEADERS, timeout=15) as resp:
                 if resp.status != 200:
                     await interaction.followup.send("🔥 *Grrr...* Cloudflare or Image service blocked the request. Try again shortly!")
@@ -158,11 +151,7 @@ class FactionBotCommands(commands.Cog):
     async def ask(self, interaction: discord.Interaction, question: str):
         await interaction.response.defer()
         try:
-            combined_instruction = f"{faction_data.SYSTEM_PROMPT}\n\nAdditional Faction Information:\n{faction_data.FACTION_PROMPT}"
-            model = genai.GenerativeModel(model_name='gemini-2.5-flash', system_instruction=combined_instruction)
-            
-            response = await asyncio.to_thread(model.generate_content, question)
-            answer = response.text
+            answer = await self.bot.get_gemini_response(question, interaction.user.id)
             formatted_response = f"**Your question:** {question}\n\n**Answer:** {answer}"
             if len(formatted_response) > 2000:
                 await interaction.followup.send(f"**Your question:** {question}")
@@ -172,10 +161,7 @@ class FactionBotCommands(commands.Cog):
             else:
                 await interaction.followup.send(formatted_response)
         except Exception as e:
-            if "429" in str(e) or "quota" in str(e).lower():
-                await interaction.followup.send("🔥 *ROAARRR!* Rate limit hit! Try again shortly!")
-            else:
-                await interaction.followup.send(f"🔥 *Grrr...* Error: {str(e)}")
+            await interaction.followup.send(f"🔥 *Grrr...* Error: {str(e)}")
 
     @app_commands.command(name="remember", description="Make the Dragon remember a faction detail or rule")
     async def remember(self, interaction: discord.Interaction, topic: str, information: str):
@@ -218,20 +204,12 @@ class FactionBotCommands(commands.Cog):
             return
             
         try:
-            combined_instruction = f"{faction_data.SYSTEM_PROMPT}\n\nAdditional Faction Information:\n{faction_data.FACTION_PROMPT}\n\nSummarize the raw text content below into a concise report."
-            model = genai.GenerativeModel(model_name="gemini-2.5-flash", system_instruction=combined_instruction)
-            
-            ai_prompt = f"Website URL: {url}\nWebsite Content:\n{web_raw_data}"
-            
-            response = await asyncio.to_thread(model.generate_content, ai_prompt)
-            summary = response.text
+            ai_prompt = f"Summarize the web page content concisely:\nWebsite URL: {url}\nWebsite Content:\n{web_raw_data}"
+            summary = await self.bot.get_gemini_response(ai_prompt, interaction.user.id)
             
             await interaction.followup.send(f"🌐 **Web Reader Report:** {url}\n\n{summary}")
         except Exception as e:
-            if "429" in str(e) or "quota" in str(e).lower():
-                await interaction.followup.send("🔥 *ROAARRR!* Rate limit hit! Try again shortly!")
-            else:
-                await interaction.followup.send(f"🔥 Web read error: {str(e)}")
+            await interaction.followup.send(f"🔥 Web read error: {str(e)}")
 
     @app_commands.command(name="copy", description="Copy a message, send text, or reply anonymously (Admin Only)")
     async def copy(
@@ -307,13 +285,15 @@ class FactionBotCommands(commands.Cog):
     @analyze.error
     async def command_cooldown_error_handler(self, interaction: discord.Interaction, error: app_commands.AppCommandError):
         if isinstance(error, app_commands.CommandOnCooldown):
-            await interaction.response.send_message(
-                f"⏰ *Hold your horses! Command cooling down. Try again in {error.retry_after:.1f}s.*", 
-                ephemeral=True
-            )
+            msg = f"⏰ *Hold your horses! Command cooling down. Try again in {error.retry_after:.1f}s.*"
         else:
-            await interaction.response.send_message(f"🔥 Execution error: {str(error)}", ephemeral=True)
+            msg = f"🔥 Execution error: {str(error)}"
+
+        if interaction.response.is_done():
+            await interaction.followup.send(msg, ephemeral=True)
+        else:
+            await interaction.response.send_message(msg, ephemeral=True)
 
 async def setup(bot):
     await bot.add_cog(FactionBotCommands(bot))
-            
+        
