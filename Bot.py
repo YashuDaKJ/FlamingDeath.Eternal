@@ -66,6 +66,7 @@ class FlamingDeathBot(commands.Bot):
         self.db_client = None
         self.db = None
         self.profiles = None
+        self.guild_configs = None
 
     async def setup_hook(self):
         """Initialize session, Mongo Async connection, and load cogs asynchronously."""
@@ -80,6 +81,7 @@ class FlamingDeathBot(commands.Bot):
                 )
                 self.db = self.db_client["eternal_faction_db"]
                 self.profiles = self.db["user_profiles"]
+                self.guild_configs = self.db["guild_configs"]  # MongoDB Guild Configs Setup
                 print("🔥 MongoDB Atlas Pipeline: FlamingDeath connected successfully!")
             except Exception as e:
                 print(f"MongoDB Async Error: {e}")
@@ -116,7 +118,6 @@ class FlamingDeathBot(commands.Bot):
         keys_to_try = API_KEYS.copy()
         random.shuffle(keys_to_try)
 
-        # Removed the duplicate model to prevent unnecessary retries
         models_to_try = ['gemini-2.5-flash']
 
         for key in keys_to_try:
@@ -262,4 +263,4 @@ if __name__ == "__main__":
     except Exception as e:
         print(f"❌ LAUNCH CRASH: {e}")
         sys.exit(1)
-                                  
+        
