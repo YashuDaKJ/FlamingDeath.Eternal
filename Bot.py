@@ -118,7 +118,8 @@ class FlamingDeathBot(commands.Bot):
         keys_to_try = API_KEYS.copy()
         random.shuffle(keys_to_try)
 
-        models_to_try = ['gemini-2.5-flash']
+        # 🚀 UPDATED TO GEMINI 3.6 FLASH WITH LITE FALLBACK 🚀
+        models_to_try = ['gemini-3.6-flash', 'gemini-3.6-flash-lite']
 
         for key in keys_to_try:
             genai.configure(api_key=key)
@@ -263,4 +264,4 @@ if __name__ == "__main__":
     except Exception as e:
         print(f"❌ LAUNCH CRASH: {e}")
         sys.exit(1)
-        
+            
