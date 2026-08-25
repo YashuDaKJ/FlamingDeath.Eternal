@@ -118,7 +118,6 @@ class FlamingDeathBot(commands.Bot):
         keys_to_try = API_KEYS.copy()
         random.shuffle(keys_to_try)
 
-        # 🚀 UPDATED TO GEMINI 3.6 FLASH WITH LITE FALLBACK 🚀
         models_to_try = ['gemini-3.6-flash', 'gemini-3.6-flash-lite']
 
         for key in keys_to_try:
@@ -157,13 +156,6 @@ bot = FlamingDeathBot()
 async def on_ready():
     print(f'🔥 {bot.user.name} is online!')
     await bot.change_presence(activity=discord.Activity(type=discord.ActivityType.watching, name="over Eternal"))
-    
-    # --- AUTO-SYNC DISABLED TO PREVENT 429 BOOT LOOP ---
-    # try:
-    #     synced = await bot.tree.sync()
-    #     print(f"Synced {len(synced)} slash commands.")
-    # except Exception as e:
-    #     print(f"Sync error: {e}")
 
 # Global Error Handler for Slash Commands to prevent crashes on 429s
 @bot.tree.error
@@ -220,37 +212,42 @@ async def on_message(message):
         
         bot.chat_cooldowns[user_id] = current_time
 
-        async with message.channel.typing():
-            clean_message = message.content.replace(f'<@{bot.user.id}>', '').replace(f'<@!{bot.user.id}>', '').strip()
-            
-            if not clean_message and is_gif: 
-                clean_message = "Look at this GIF I sent you!"
-            elif not clean_message and message.attachments: 
-                clean_message = "Look at this file!"
+        # Safe Typing Block to prevent crashes during Discord rate limits
+        try:
+            async with message.channel.typing():
+                clean_message = message.content.replace(f'<@{bot.user.id}>', '').replace(f'<@!{bot.user.id}>', '').strip()
                 
-            if clean_message:
-                attachment_data = None
-                if message.attachments and bot.session:
-                    try:
-                        file_attachment = message.attachments[0]
-                        if file_attachment.content_type:
-                            async with bot.session.get(file_attachment.url, headers=DEFAULT_HEADERS) as resp:
-                                if resp.status == 200:
-                                    file_bytes = await resp.read()
-                                    attachment_data = {
-                                        'mime_type': file_attachment.content_type, 
-                                        'data': file_bytes
-                                    }
-                    except Exception as e:
-                        print(f"Attachment download failed: {e}")
+                if not clean_message and is_gif: 
+                    clean_message = "Look at this GIF I sent you!"
+                elif not clean_message and message.attachments: 
+                    clean_message = "Look at this file!"
+                    
+                if clean_message:
+                    attachment_data = None
+                    if message.attachments and bot.session:
+                        try:
+                            file_attachment = message.attachments[0]
+                            if file_attachment.content_type:
+                                async with bot.session.get(file_attachment.url, headers=DEFAULT_HEADERS) as resp:
+                                    if resp.status == 200:
+                                        file_bytes = await resp.read()
+                                        attachment_data = {
+                                            'mime_type': file_attachment.content_type, 
+                                            'data': file_bytes
+                                        }
+                        except Exception as e:
+                            print(f"Attachment download failed: {e}")
 
-                response = await bot.get_gemini_response(clean_message, message.author.id, attachment_data)
-                if len(response) > 2000:
-                    chunks = [response[i:i+1900] for i in range(0, len(response), 1900)]
-                    for chunk in chunks:
-                        await message.reply(chunk, mention_author=False)
-                else:
-                    await message.reply(response, mention_author=False)
+                    response = await bot.get_gemini_response(clean_message, message.author.id, attachment_data)
+                    if len(response) > 2000:
+                        chunks = [response[i:i+1900] for i in range(0, len(response), 1900)]
+                        for chunk in chunks:
+                            await message.reply(chunk, mention_author=False)
+                    else:
+                        await message.reply(response, mention_author=False)
+        except discord.errors.HTTPException as typing_err:
+            if typing_err.status == 429:
+                print("⚠️ Typing status skipped due to Discord rate limit.")
 
 if __name__ == "__main__":
     print("🚀 Connecting FlamingDeath Gateway...")
@@ -264,4 +261,4 @@ if __name__ == "__main__":
     except Exception as e:
         print(f"❌ LAUNCH CRASH: {e}")
         sys.exit(1)
-            
+                
