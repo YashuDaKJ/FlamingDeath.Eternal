@@ -4,12 +4,11 @@ import sys
 import asyncio
 import random
 import certifi
-from threading import Thread
 from flask import Flask
 
 import discord
 from discord.ext import commands
-from discord import app_commands  # Required for the error handler
+from discord import app_commands
 import google.generativeai as genai
 import motor.motor_asyncio
 import aiohttp
@@ -21,18 +20,14 @@ DEFAULT_HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
 }
 
-# --- Web Server Setup for 24/7 Hosting ---
+# --- Web Server Setup for Gunicorn ---
 app = Flask('')
 
 @app.route('/')
 def home():
     return "FlamingDeath is perfectly alive and burning!"
 
-def run_web_server():
-    port = int(os.getenv("PORT", 10000))
-    app.run(host='0.0.0.0', port=port)
-
-Thread(target=run_web_server, daemon=True).start()
+# REMOVED: Thread(target=run_web_server) logic removed to eliminate Port 10000 conflicts with Gunicorn.
 
 # --- Environment Variables ---
 DISCORD_TOKEN = os.getenv('DISCORD_TOKEN')
@@ -81,7 +76,7 @@ class FlamingDeathBot(commands.Bot):
                 )
                 self.db = self.db_client["eternal_faction_db"]
                 self.profiles = self.db["user_profiles"]
-                self.guild_configs = self.db["guild_configs"]  # MongoDB Guild Configs Setup
+                self.guild_configs = self.db["guild_configs"]
                 print("🔥 MongoDB Atlas Pipeline: FlamingDeath connected successfully!")
             except Exception as e:
                 print(f"MongoDB Async Error: {e}")
@@ -261,4 +256,4 @@ if __name__ == "__main__":
     except Exception as e:
         print(f"❌ LAUNCH CRASH: {e}")
         sys.exit(1)
-                
+                                  
