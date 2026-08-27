@@ -27,8 +27,6 @@ app = Flask('')
 def home():
     return "FlamingDeath is perfectly alive and burning!"
 
-# REMOVED: Thread(target=run_web_server) logic removed to eliminate Port 10000 conflicts with Gunicorn.
-
 # --- Environment Variables ---
 DISCORD_TOKEN = os.getenv('DISCORD_TOKEN')
 MONGO_URI = os.getenv('MONGO_URI')
@@ -113,7 +111,11 @@ class FlamingDeathBot(commands.Bot):
         keys_to_try = API_KEYS.copy()
         random.shuffle(keys_to_try)
 
-        models_to_try = ['gemini-3.6-flash', 'gemini-3.6-flash-lite']
+        # FIXED: Official Gemini Registry names only
+        models_to_try = [
+            'models/gemini-3.6-flash',
+            'models/gemini-3.5-flash-lite'
+        ]
 
         for key in keys_to_try:
             genai.configure(api_key=key)
@@ -138,7 +140,8 @@ class FlamingDeathBot(commands.Bot):
                     print(f"Error on key with model {model_name}: {error_str}")
                     
                     if "429" in error_str or "quota" in error_str.lower() or "resource_exhausted" in error_str.lower():
-                        await asyncio.sleep(1)
+                        # Pausing 3 seconds prevents burning all daily quota instantly
+                        await asyncio.sleep(3)
                         continue
                     else:
                         break
@@ -256,4 +259,4 @@ if __name__ == "__main__":
     except Exception as e:
         print(f"❌ LAUNCH CRASH: {e}")
         sys.exit(1)
-                                  
+                                                      
