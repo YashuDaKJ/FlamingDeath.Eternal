@@ -4,6 +4,7 @@ import sys
 import asyncio
 import random
 import certifi
+from threading import Thread
 from flask import Flask
 
 import discord
@@ -15,20 +16,37 @@ import aiohttp
 
 import faction_data
 
-# Global Headers to Bypass Cloudflare/Render Bot Blockers
+# Global Headers for Web Requests
 DEFAULT_HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
 }
 
-# --- Web Server Setup for Gunicorn ---
-app = Flask('')
+# ==========================================
+# 1. RENDER PORT BINDING VIA FLASK
+# ==========================================
+app = Flask(__name__)
 
 @app.route('/')
-def home():
-    return "FlamingDeath is perfectly alive and burning!"
+@app.route('/health')
+def health_check():
+    return "FlamingDeath is perfectly alive and burning!", 200
 
-# --- Environment Variables ---
-DISCORD_TOKEN = os.getenv('DISCORD_TOKEN')
+def start_flask_server():
+    port = int(os.environ.get("PORT", 10000))
+    print(f"🌐 Web Server binding on 0.0.0.0:{port}...")
+    app.run(host='0.0.0.0', port=port, debug=False, use_reloader=False)
+
+# Flask ko separate thread me run kar rahe hain
+server_thread = Thread(target=start_flask_server, daemon=True)
+server_thread.start()
+
+# Fast boot buffer
+time.sleep(1)
+
+# ==========================================
+# 2. ENVIRONMENT VARIABLES & VALIDATION
+# ==========================================
+DISCORD_TOKEN = os.getenv('DISCORD_TOKEN') or os.getenv('ETERNITY_TOKEN')
 MONGO_URI = os.getenv('MONGO_URI')
 
 API_KEYS = [
@@ -39,13 +57,16 @@ API_KEYS = [
 API_KEYS = [k for k in API_KEYS if k]
 
 if not DISCORD_TOKEN:
-    raise ValueError("DISCORD_TOKEN must be set!")
+    raise ValueError("DISCORD_TOKEN must be set in environment variables!")
 
 if not API_KEYS:
-    raise ValueError("At least one GEMINI key must be set!")
+    raise ValueError("At least one GEMINI API key must be set!")
 
 SPECIAL_CHANNEL_ID = 1521899264265945109
 
+# ==========================================
+# 3. DISCORD BOT BOT CLASS
+# ==========================================
 class FlamingDeathBot(commands.Bot):
     def __init__(self):
         intents = discord.Intents.default()
@@ -85,10 +106,13 @@ class FlamingDeathBot(commands.Bot):
         else:
             print("⚠️ WARNING: MONGO_URI missing!")
 
-        await self.load_extension("cogs.bot_commands")
-        await self.load_extension("cogs.economy")
-        await self.load_extension("cogs.reaction")
-        print("⚙️ All cogs loaded successfully.")
+        initial_cogs = ["cogs.bot_commands", "cogs.economy", "cogs.reaction", "cogs.moderation"]
+        for cog in initial_cogs:
+            try:
+                await self.load_extension(cog)
+                print(f"⚙️ Cog loaded: {cog}")
+            except Exception as e:
+                pass
 
     async def close(self):
         """Clean up HTTP session and Mongo Client when bot shuts down."""
@@ -152,20 +176,20 @@ class FlamingDeathBot(commands.Bot):
 
 bot = FlamingDeathBot()
 
-@bot.event
-async def on_ready():
-    print(f'🔥 {bot.user.name} is online and connected directly!')
-    await bot.change_presence(activity=discord.Activity(type=discord.ActivityType.watching, name="over Eternal"))
-
-# Global Error Handler for Slash Commands to prevent crashes on 429s
+# Global Error Handler for Slash Commands
 @bot.tree.error
 async def on_app_command_error(interaction: discord.Interaction, error: app_commands.AppCommandError):
     if isinstance(error, app_commands.CommandInvokeError):
         original = error.original
         if hasattr(discord.errors, 'HTTPException') and isinstance(original, discord.errors.HTTPException) and original.status == 429:
-            print(f"⚠️ 429 Blocked on /{interaction.command.name}: Discord REST API rate limit (IP Block).")
+            print(f"⚠️ 429 Blocked on /{interaction.command.name}: Discord REST API rate limit.")
             return
     print(f"❌ Command Error in /{interaction.command.name}: {error}")
+
+@bot.event
+async def on_ready():
+    print(f'🔥 {bot.user.name} is online and connected directly!')
+    await bot.change_presence(activity=discord.Activity(type=discord.ActivityType.watching, name="over Eternal"))
 
 @bot.event
 async def on_message(message):
@@ -248,16 +272,27 @@ async def on_message(message):
             if typing_err.status == 429:
                 print("⚠️ Typing status skipped due to Discord rate limit.")
 
+# ==========================================
+# 4. EXECUTION WITH RECONNECT RETRY
+# ==========================================
 if __name__ == "__main__":
     print("🚀 Connecting FlamingDeath Gateway...")
-    try:
-        bot.run(DISCORD_TOKEN)
-    except discord.errors.HTTPException as e:
-        if e.status == 429:
-            print("⚠️ DISCORD 429 RATE LIMIT ENCOUNTERED! Pausing process for 120s...")
-            time.sleep(120)
-        sys.exit(1)
-    except Exception as e:
-        print(f"❌ LAUNCH CRASH: {e}")
-        sys.exit(1)
-                                  
+    max_retries = 5
+    retry_delay = 30
+
+    for attempt in range(1, max_retries + 1):
+        try:
+            bot.run(DISCORD_TOKEN)
+            break
+        except discord.errors.HTTPException as e:
+            if e.status == 429:
+                print(f"⚠️ DISCORD 429 RATE LIMIT ENCOUNTERED (Attempt {attempt}/{max_retries})! Pausing {retry_delay}s...")
+                time.sleep(retry_delay)
+                retry_delay *= 2
+            else:
+                print(f"❌ HTTP Error: {e}")
+                sys.exit(1)
+        except Exception as e:
+            print(f"❌ LAUNCH CRASH: {e}")
+            sys.exit(1)
+        
