@@ -15,6 +15,9 @@ import aiohttp
 
 import faction_data
 
+# --- YOUR CLOUDFLARE PROXY URL ---
+PROXY_URL = "https://morning-rain-5c30.aruntailor635.workers.dev"
+
 # Global Headers to Bypass Cloudflare/Render Bot Blockers
 DEFAULT_HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
@@ -51,7 +54,13 @@ class FlamingDeathBot(commands.Bot):
         intents = discord.Intents.default()
         intents.message_content = True
         intents.members = True
-        super().__init__(command_prefix='!', intents=intents)
+        
+        # PROXY ADDED HERE TO ROUTE TRAFFIC VIA CLOUDFLARE
+        super().__init__(
+            command_prefix='!', 
+            intents=intents,
+            proxy=PROXY_URL
+        )
         
         self.conversation_history = {}
         self.chat_cooldowns = {}
@@ -111,10 +120,9 @@ class FlamingDeathBot(commands.Bot):
         keys_to_try = API_KEYS.copy()
         random.shuffle(keys_to_try)
 
-        # FIXED: Official Gemini Registry names only
         models_to_try = [
-            'models/gemini-3.6-flash',
-            'models/gemini-3.5-flash-lite'
+            'models/gemini-1.5-flash',
+            'models/gemini-1.5-pro'
         ]
 
         for key in keys_to_try:
@@ -140,7 +148,6 @@ class FlamingDeathBot(commands.Bot):
                     print(f"Error on key with model {model_name}: {error_str}")
                     
                     if "429" in error_str or "quota" in error_str.lower() or "resource_exhausted" in error_str.lower():
-                        # Pausing 3 seconds prevents burning all daily quota instantly
                         await asyncio.sleep(3)
                         continue
                     else:
@@ -152,7 +159,7 @@ bot = FlamingDeathBot()
 
 @bot.event
 async def on_ready():
-    print(f'🔥 {bot.user.name} is online!')
+    print(f'🔥 {bot.user.name} is online via Cloudflare Proxy!')
     await bot.change_presence(activity=discord.Activity(type=discord.ActivityType.watching, name="over Eternal"))
 
 # Global Error Handler for Slash Commands to prevent crashes on 429s
@@ -210,7 +217,6 @@ async def on_message(message):
         
         bot.chat_cooldowns[user_id] = current_time
 
-        # Safe Typing Block to prevent crashes during Discord rate limits
         try:
             async with message.channel.typing():
                 clean_message = message.content.replace(f'<@{bot.user.id}>', '').replace(f'<@!{bot.user.id}>', '').strip()
@@ -248,15 +254,15 @@ async def on_message(message):
                 print("⚠️ Typing status skipped due to Discord rate limit.")
 
 if __name__ == "__main__":
-    print("🚀 Connecting FlamingDeath Gateway...")
+    print("🚀 Connecting FlamingDeath Gateway via Proxy...")
     try:
         bot.run(DISCORD_TOKEN)
     except discord.errors.HTTPException as e:
         if e.status == 429:
-            print("⚠️ DISCORD 429 RATE LIMIT ENCOUNTERED! Pausing process to prevent infinite crash loop...")
-            time.sleep(120)
+            print("⚠️ DISCORD 429 RATE LIMIT ENCOUNTERED! Pausing process...")
+            time.sleep(60)
         sys.exit(1)
     except Exception as e:
         print(f"❌ LAUNCH CRASH: {e}")
         sys.exit(1)
-                                                      
+            
