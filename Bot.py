@@ -15,8 +15,8 @@ import aiohttp
 
 import faction_data
 
-# Cloudflare Worker Proxy URL
-WORKER_PROXY_URL = "https://morning-rain-5c30.aruntailor635.workers.dev"
+# Environment variable se Cloudflare Worker Proxy URL fetch karein (Fallback ke saath)
+WORKER_PROXY_URL = os.getenv('WORKER_PROXY_URL', 'https://morning-rain-5c30.aruntailor635.workers.dev')
 
 # Global Headers to Bypass Cloudflare/Render Bot Blockers
 DEFAULT_HEADERS = {
