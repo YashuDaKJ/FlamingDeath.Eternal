@@ -15,9 +15,6 @@ import aiohttp
 
 import faction_data
 
-# Environment variable se Cloudflare Worker Proxy URL fetch karein (Fallback ke saath)
-WORKER_PROXY_URL = os.getenv('WORKER_PROXY_URL', 'https://morning-rain-5c30.aruntailor635.workers.dev')
-
 # Global Headers to Bypass Cloudflare/Render Bot Blockers
 DEFAULT_HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
@@ -55,15 +52,9 @@ class FlamingDeathBot(commands.Bot):
         intents.message_content = True
         intents.members = True
         
-        # Override Discord API base_url via Cloudflare Worker Proxy
-        http_options = {
-            'base_url': WORKER_PROXY_URL
-        }
-        
         super().__init__(
             command_prefix='!', 
-            intents=intents,
-            http_options=http_options
+            intents=intents
         )
         
         self.conversation_history = {}
@@ -163,7 +154,7 @@ bot = FlamingDeathBot()
 
 @bot.event
 async def on_ready():
-    print(f'🔥 {bot.user.name} is online via Cloudflare Worker Proxy!')
+    print(f'🔥 {bot.user.name} is online and connected directly!')
     await bot.change_presence(activity=discord.Activity(type=discord.ActivityType.watching, name="over Eternal"))
 
 # Global Error Handler for Slash Commands to prevent crashes on 429s
@@ -258,15 +249,15 @@ async def on_message(message):
                 print("⚠️ Typing status skipped due to Discord rate limit.")
 
 if __name__ == "__main__":
-    print("🚀 Connecting FlamingDeath Gateway via Cloudflare Worker Proxy...")
+    print("🚀 Connecting FlamingDeath Gateway...")
     try:
         bot.run(DISCORD_TOKEN)
     except discord.errors.HTTPException as e:
         if e.status == 429:
-            print("⚠️ DISCORD 429 RATE LIMIT ENCOUNTERED! Pausing process...")
-            time.sleep(60)
+            print("⚠️ DISCORD 429 RATE LIMIT ENCOUNTERED! Pausing process for 120s...")
+            time.sleep(120)
         sys.exit(1)
     except Exception as e:
         print(f"❌ LAUNCH CRASH: {e}")
         sys.exit(1)
-        
+                                  
