@@ -15,8 +15,8 @@ import aiohttp
 
 import faction_data
 
-# --- YOUR CLOUDFLARE PROXY URL ---
-PROXY_URL = "https://morning-rain-5c30.aruntailor635.workers.dev"
+# Cloudflare Worker Proxy URL
+WORKER_PROXY_URL = "https://morning-rain-5c30.aruntailor635.workers.dev"
 
 # Global Headers to Bypass Cloudflare/Render Bot Blockers
 DEFAULT_HEADERS = {
@@ -55,11 +55,15 @@ class FlamingDeathBot(commands.Bot):
         intents.message_content = True
         intents.members = True
         
-        # PROXY ADDED HERE TO ROUTE TRAFFIC VIA CLOUDFLARE
+        # Override Discord API base_url via Cloudflare Worker Proxy
+        http_options = {
+            'base_url': WORKER_PROXY_URL
+        }
+        
         super().__init__(
             command_prefix='!', 
             intents=intents,
-            proxy=PROXY_URL
+            http_options=http_options
         )
         
         self.conversation_history = {}
@@ -159,7 +163,7 @@ bot = FlamingDeathBot()
 
 @bot.event
 async def on_ready():
-    print(f'🔥 {bot.user.name} is online via Cloudflare Proxy!')
+    print(f'🔥 {bot.user.name} is online via Cloudflare Worker Proxy!')
     await bot.change_presence(activity=discord.Activity(type=discord.ActivityType.watching, name="over Eternal"))
 
 # Global Error Handler for Slash Commands to prevent crashes on 429s
@@ -254,7 +258,7 @@ async def on_message(message):
                 print("⚠️ Typing status skipped due to Discord rate limit.")
 
 if __name__ == "__main__":
-    print("🚀 Connecting FlamingDeath Gateway via Proxy...")
+    print("🚀 Connecting FlamingDeath Gateway via Cloudflare Worker Proxy...")
     try:
         bot.run(DISCORD_TOKEN)
     except discord.errors.HTTPException as e:
@@ -265,4 +269,4 @@ if __name__ == "__main__":
     except Exception as e:
         print(f"❌ LAUNCH CRASH: {e}")
         sys.exit(1)
-            
+        
