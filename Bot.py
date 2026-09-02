@@ -15,7 +15,18 @@ from discord import app_commands
 import google.generativeai as genai
 import motor.motor_asyncio
 
-import core_data as faction_data
+# Add Render Secret Files mount path (/etc/secrets) to sys.path
+if os.path.exists('/etc/secrets'):
+    sys.path.append('/etc/secrets')
+
+try:
+    import core_data as faction_data
+except ModuleNotFoundError as e:
+    print(f"⚠️ Warning: Failed to import core_data: {e}")
+    class FactionDataFallback:
+        SYSTEM_PROMPT = ""
+        FACTION_PROMPT = ""
+    faction_data = FactionDataFallback()
 
 DEFAULT_HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
@@ -38,13 +49,13 @@ def run_web_server():
 server_thread = Thread(target=run_web_server, daemon=True)
 server_thread.start()
 
-# Fast buffer to ensure Flask server starts cleanly before Discord login
 time.sleep(1)
 
 # ==========================================
 # 2. LOAD ENVIRONMENT VARIABLES & CONFIG
 # ==========================================
 DISCORD_TOKEN = os.getenv('ETERNITY_TOKEN') or os.getenv('DISCORD_TOKEN')
+PROXY_URL = os.getenv('DISCORD_PROXY_URL')  # e.g. https://your-worker.workers.dev/api/v10
 MONGO_URI = os.getenv('MONGO_URI')
 OWNER_ID = int(os.getenv('OWNER_ID', 1477528681709830297))
 
@@ -70,9 +81,14 @@ class EternityBot(commands.Bot):
         intents.message_content = True
         intents.members = True
 
+        http_options = {}
+        if PROXY_URL:
+            http_options["api_base"] = PROXY_URL
+
         super().__init__(
             command_prefix='?', 
-            intents=intents
+            intents=intents,
+            http_options=http_options
         )
         
         self.SPECIAL_CHANNEL_ID = 1500095634588569600
@@ -295,15 +311,13 @@ class EternityBot(commands.Bot):
 # ==========================================
 async def start_gateway():
     max_retries = 10
-    retry_delay = 60  # Initial 60-second delay for IP rate limit cooldown
+    retry_delay = 60
 
     for attempt in range(1, max_retries + 1):
         print(f"🚀 Initializing Gateway Attempt {attempt}/{max_retries}...")
         
-        # Instantiate a FRESH bot instance on every attempt to avoid closed session crashes
         bot = EternityBot()
 
-        # Command attachments
         @bot.command(name='ping')
         async def ping(ctx):
             latency = round(bot.latency * 1000)
@@ -338,7 +352,7 @@ async def start_gateway():
             if e.status == 429:
                 print(f"⚠️ Discord HTTP 429 (Rate Limit). Shared Render IP blocked. Retrying in {retry_delay}s...")
                 await asyncio.sleep(retry_delay)
-                retry_delay = min(retry_delay * 2, 300)  # Cap max retry backoff at 5 minutes
+                retry_delay = min(retry_delay * 2, 300)
             else:
                 print(f"❌ Discord HTTP Exception: {e}")
                 sys.exit(1)
