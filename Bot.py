@@ -15,7 +15,13 @@ from discord import app_commands
 import google.generativeai as genai
 import motor.motor_asyncio
 
-import faction_data
+try:
+    import faction_data
+except ModuleNotFoundError:
+    class FactionDataFallback:
+        SYSTEM_PROMPT = ""
+        FACTION_PROMPT = ""
+    faction_data = FactionDataFallback()
 
 # ==========================================
 # 0. FORCE UNBUFFERED STDOUT
@@ -133,7 +139,6 @@ class FlamingDeathBot(commands.Bot):
         else:
             log("⚠️ WARNING: MONGO_URI missing!")
 
-        # Exactly matches your repo's cogs folder structure
         initial_cogs = ["cogs.bot_commands", "cogs.economy", "cogs.reaction"]
         for cog in initial_cogs:
             try:
@@ -154,7 +159,9 @@ class FlamingDeathBot(commands.Bot):
         if user_id not in self.conversation_history:
             self.conversation_history[user_id] = []
 
-        combined_instruction = f"{faction_data.SYSTEM_PROMPT}\n\nAdditional Faction Information:\n{faction_data.FACTION_PROMPT}"
+        sys_prompt = getattr(faction_data, 'SYSTEM_PROMPT', '')
+        fact_prompt = getattr(faction_data, 'FACTION_PROMPT', '')
+        combined_instruction = f"{sys_prompt}\n\nAdditional Faction Information:\n{fact_prompt}"
 
         if attachment_data:
             contents_payload = [user_message, attachment_data]
@@ -361,4 +368,4 @@ async def start_gateway():
 
 if __name__ == "__main__":
     asyncio.run(start_gateway())
-    
+        
