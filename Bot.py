@@ -176,8 +176,8 @@ class FlamingDeathBot(commands.Bot):
         random.shuffle(keys_to_try)
 
         models_to_try = [
-            'models/gemini-1.5-flash',
-            'models/gemini-1.5-pro'
+            'models/gemini-3.6-flash',
+            'models/gemini-3.5-flash-lite'
         ]
 
         for key in keys_to_try:
