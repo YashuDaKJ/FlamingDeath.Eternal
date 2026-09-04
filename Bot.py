@@ -15,14 +15,6 @@ from discord import app_commands
 import google.generativeai as genai
 import motor.motor_asyncio
 
-try:
-    import faction_data
-except ModuleNotFoundError:
-    class FactionDataFallback:
-        SYSTEM_PROMPT = ""
-        FACTION_PROMPT = ""
-    faction_data = FactionDataFallback()
-
 # ==========================================
 # 0. FORCE UNBUFFERED STDOUT
 # ==========================================
@@ -34,9 +26,18 @@ except Exception:
 def log(msg: str):
     print(msg, flush=True)
 
-# Secret Files mount path check
+# Secret Files mount path check — MUST run before importing faction_data,
+# since that module may live under /etc/secrets on Render.
 if os.path.exists('/etc/secrets'):
     sys.path.append('/etc/secrets')
+
+try:
+    import faction_data
+except ModuleNotFoundError:
+    class FactionDataFallback:
+        SYSTEM_PROMPT = ""
+        FACTION_PROMPT = ""
+    faction_data = FactionDataFallback()
 
 DEFAULT_HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
@@ -368,4 +369,3 @@ async def start_gateway():
 
 if __name__ == "__main__":
     asyncio.run(start_gateway())
-        
