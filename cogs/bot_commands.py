@@ -54,12 +54,66 @@ def build_help_embed() -> discord.Embed:
             "`/work` - Complete faction tasks for Crystals.\n"
             "`/crime` - Attempt high-risk raids for Crystals.\n"
             "`/slots <bet>` - Play Dragon Slot Machine.\n"
-            "`/hunt` - Hunt beasts for rare crystal rewards.\n"
-            "`/coinflip <heads/tails> <bet>` - 50/50 crystal wager.\n"
-            "`/play` - Mini RPG challenges.\n"
-            "`/leaderboard` - Top crystal hoarders in the faction.\n"
+            "`/roll <bet> <guess>` - Bet on a dragon die roll (1-6).\n"
+            "`/cards <bet>` - Draw against Flamy, highest card wins!\n"
+            "`/fish` - Hunt for rare river catches.\n"
+            "`/highlow <bet> <guess>` - Guess if the next number is higher or lower.\n"
+            "`/leaderboard` - Top crystal hoarders in the faction."
+        ),
+        inline=False
+    )
+
+    embed.add_field(
+        name="💰 Vault & Shop System",
+        value=(
+            "`/vault balance` - Check wallet and vault savings.\n"
+            "`/vault deposit <amount>` - Move crystals to vault.\n"
+            "`/vault withdraw <amount>` - Withdraw from vault.\n"
+            "`/shop` - Browse marketplace items.\n"
+            "`/buy <item_id>` - Purchase items with Crystals.\n"
+            "`/inventory` - View your purchased items."
+        ),
+        inline=False
+    )
+
+    embed.add_field(
+        name="📈 XP & Rank System",
+        value=(
+            "`/rank` - View your faction level & XP progress.\n"
+            "`/rankroles list` - See rank role rewards.\n"
+            "`/rankroles set <level> <role>` - Assign rank rewards (Admin).\n"
+            "`/xpsettings <min> <max> <cooldown>` - Configure XP (Admin)."
+        ),
+        inline=False
+    )
+
+    embed.add_field(
+        name="🛡️ Roles & Membership",
+        value=(
+            "`/wings` - Check your faction roles.\n"
+            "`/roleselect` - Pick self-assignable roles.\n"
+            "`/addselfrole <role>` - Add role to picker (Admin).\n"
+            "`/claimrole <code>` - Claim event-specific roles.\n"
+            "`/setclaimrole <code> <role>` - Register claimable role (Admin)."
+        ),
+        inline=False
+    )
+
+    embed.add_field(
+        name="📊 Server Info & Stats",
+        value=(
+            "`/facstats` - View server statistics.\n"
+            "`/avatar [member]` - Display a member's avatar."
+        ),
+        inline=False
+    )
+
+    embed.add_field(
+        name="🔥 Flamy AI & Fun",
+        value=(
+            "`/roast [member]` - Get playfully roasted!\n"
             "`/match <member>` - Test compatibility with a member.\n"
-            "`/calc <expr>` - Quick math calculator."
+            "`/calc <expression>` - Quick math calculator."
         ),
         inline=False
     )
@@ -296,4 +350,3 @@ class FactionBotCommands(commands.Cog):
 
 async def setup(bot):
     await bot.add_cog(FactionBotCommands(bot))
-        
