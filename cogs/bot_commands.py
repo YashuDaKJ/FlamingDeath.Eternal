@@ -37,6 +37,16 @@ def build_help_embed() -> discord.Embed:
     )
 
     embed.add_field(
+        name="🎭 Action & Roleplay Commands",
+        value=(
+            "⚔️ **Combat & Roleplay:** `/hug`, `/punch`, `/pat`, `/slap`, `/doom`, `/burn`, `/blast`, `/highfive`\n"
+            "🎉 **Fun & Party:** `/cake`, `/spray`, `/pie`\n"
+            "*(Usage: `/doom @user` or `!flamy doom @user`)*"
+        ),
+        inline=False
+    )
+
+    embed.add_field(
         name="🎨 AI & Vision Commands",
         value=(
             "`/imagine <prompt>` - Generate AI images via Pollinations.ai!\n"
@@ -350,3 +360,4 @@ class FactionBotCommands(commands.Cog):
 
 async def setup(bot):
     await bot.add_cog(FactionBotCommands(bot))
+                                            
