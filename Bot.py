@@ -140,7 +140,7 @@ class FlamingDeathBot(commands.Bot):
         else:
             log("⚠️ WARNING: MONGO_URI missing!")
 
-        initial_cogs = ["cogs.bot_commands", "cogs.economy", "cogs.reaction"]
+        initial_cogs = ["cogs.bot_commands", "cogs.economy", "cogs.reaction", "cogs.actions"]
         for cog in initial_cogs:
             try:
                 await self.load_extension(cog)
