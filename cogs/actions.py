@@ -36,7 +36,7 @@ class ActionsCog(commands.Cog):
         gif_url = random.choice(gifs)
 
         # Create embed
-        embed = discord.Embed(color=discord.Color.cyan())
+        embed = discord.Embed(color=discord.Color.teal())
         embed.set_image(url=gif_url)
 
         # Set text based on action type
