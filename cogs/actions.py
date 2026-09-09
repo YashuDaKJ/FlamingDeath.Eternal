@@ -3,7 +3,7 @@ from discord.ext import commands
 from discord import app_commands
 import random
 
-# Complete Integrated Action GIFs Dictionary (110 GIFs across 11 commands)
+# Complete 110 GIFs Dictionary (Single File Architecture)
 ACTION_GIFS = {
     "hug": [
         "https://media.giphy.com/media/l2QDM9Jnim1YV55YA/giphy.gif",
@@ -144,12 +144,12 @@ class ActionsCog(commands.Cog):
         self.bot = bot
 
     ACTION_TEXTS = {
-        'doom': lambda author, target: f"🚀💥 {author.mention} launched a missile/tank strike and DOOMED {target.mention} into oblivion!",
-        'burn': lambda author, target: f"🔥 {author.mention} set {target.mention} on fire with a scorching flamethrower attack!",
-        'blast': lambda author, target: f"💣💥 {author.mention} triggered an explosive blast and BLEW UP {target.mention}!",
-        'spray': lambda author, target: f"🎉 {author.mention} sprayed party foam / silly string all over {target.mention}!",
-        'cake': lambda author, target: f"🎂 {author.mention} smashed a birthday cake on {target.mention}'s face!",
-        'pie': lambda author, target: f"🥧 {author.mention} threw a cream pie right into {target.mention}'s face!",
+        'doom': lambda author, target: f"🚀💥 {author.mention} launched a missile strike and DOOMED {target.mention}!",
+        'burn': lambda author, target: f"🔥 {author.mention} set {target.mention} on fire with a flamethrower!",
+        'blast': lambda author, target: f"💣💥 {author.mention} triggered an explosive blast on {target.mention}!",
+        'spray': lambda author, target: f"🎉 {author.mention} sprayed party foam all over {target.mention}!",
+        'cake': lambda author, target: f"🎂 {author.mention} smashed a cake on {target.mention}'s face!",
+        'pie': lambda author, target: f"🥧 {author.mention} threw a cream pie at {target.mention}!",
     }
 
     async def perform_action(self, interaction: discord.Interaction, action: str, target: discord.Member):
@@ -157,79 +157,74 @@ class ActionsCog(commands.Cog):
             await interaction.response.send_message("❌ You can't do that to yourself!", ephemeral=True)
             return
 
-        default_gif = "https://media.giphy.com/media/l2QDM9Jnim1YV55YA/giphy.gif"
-        gifs = ACTION_GIFS.get(action.lower(), [default_gif])
-        gif_url = random.choice(gifs) if gifs else default_gif
-
-        embed = discord.Embed(color=discord.Color.teal())
+        act_key = action.lower()
         
-        if gif_url and str(gif_url).startswith("http"):
-            embed.set_image(url=gif_url.strip())
+        # Fallback GIF if list fetch encounters broken link
+        fallback_gif = "https://media.tenor.com/gbf398P3xTEAAAAC/hug-anime.gif"
+        
+        # Get random GIF URL from dictionary
+        gif_list = ACTION_GIFS.get(act_key, [fallback_gif])
+        selected_gif = random.choice(gif_list) if gif_list else fallback_gif
 
-        if action.lower() in self.ACTION_TEXTS:
-            text = self.ACTION_TEXTS[action.lower()](interaction.user, target)
+        # Generate custom text
+        if act_key in self.ACTION_TEXTS:
+            text = self.ACTION_TEXTS[act_key](interaction.user, target)
         else:
-            text = f"{interaction.user.mention} {action}ed {target.mention}!"
+            text = f"{interaction.user.mention} {act_key}ed {target.mention}!"
 
-        embed.description = text
+        # Create embed
+        embed = discord.Embed(description=text, color=discord.Color.teal())
+        embed.set_image(url=selected_gif)
         embed.set_footer(text=f"Requested by {interaction.user.display_name}", icon_url=interaction.user.display_avatar.url)
 
-        await interaction.response.send_message(embed=embed)
+        # Dual delivery: Passing URL in content guarantees rendering even if embed block fails
+        await interaction.response.send_message(content=selected_gif, embed=embed)
 
+    # Command Definitions
     @app_commands.command(name="hug", description="Give someone a warm hug!")
-    @app_commands.describe(target="The person to hug")
     async def hug(self, interaction: discord.Interaction, target: discord.Member):
         await self.perform_action(interaction, "hug", target)
 
     @app_commands.command(name="punch", description="Punch someone!")
-    @app_commands.describe(target="The person to punch")
     async def punch(self, interaction: discord.Interaction, target: discord.Member):
         await self.perform_action(interaction, "punch", target)
 
     @app_commands.command(name="pat", description="Pat someone on the head")
-    @app_commands.describe(target="The person to pat")
     async def pat(self, interaction: discord.Interaction, target: discord.Member):
         await self.perform_action(interaction, "pat", target)
 
     @app_commands.command(name="slap", description="Slap someone!")
-    @app_commands.describe(target="The person to slap")
     async def slap(self, interaction: discord.Interaction, target: discord.Member):
         await self.perform_action(interaction, "slap", target)
 
     @app_commands.command(name="doom", description="Launch a devastating doom attack!")
-    @app_commands.describe(target="The person to doom")
     async def doom(self, interaction: discord.Interaction, target: discord.Member):
         await self.perform_action(interaction, "doom", target)
 
     @app_commands.command(name="burn", description="Set someone on fire with a flamethrower!")
-    @app_commands.describe(target="The person to burn")
     async def burn(self, interaction: discord.Interaction, target: discord.Member):
         await self.perform_action(interaction, "burn", target)
 
     @app_commands.command(name="blast", description="Trigger an explosive blast!")
-    @app_commands.describe(target="The person to blast")
     async def blast(self, interaction: discord.Interaction, target: discord.Member):
         await self.perform_action(interaction, "blast", target)
 
     @app_commands.command(name="highfive", description="Give someone a high five!")
-    @app_commands.describe(target="The person to high five")
     async def highfive(self, interaction: discord.Interaction, target: discord.Member):
         await self.perform_action(interaction, "highfive", target)
 
     @app_commands.command(name="cake", description="Smash a birthday cake on someone's face!")
-    @app_commands.describe(target="The person to cake")
     async def cake(self, interaction: discord.Interaction, target: discord.Member):
         await self.perform_action(interaction, "cake", target)
 
     @app_commands.command(name="spray", description="Spray party foam all over someone!")
-    @app_commands.describe(target="The person to spray")
     async def spray(self, interaction: discord.Interaction, target: discord.Member):
         await self.perform_action(interaction, "spray", target)
 
     @app_commands.command(name="pie", description="Throw a cream pie at someone!")
-    @app_commands.describe(target="The person to pie")
     async def pie(self, interaction: discord.Interaction, target: discord.Member):
         await self.perform_action(interaction, "pie", target)
 
 async def setup(bot):
     await bot.add_cog(ActionsCog(bot))
+    
