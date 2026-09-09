@@ -2,7 +2,16 @@ import discord
 from discord.ext import commands
 from discord import app_commands
 import random
-from actions_data import ACTION_GIFS
+import sys
+import os
+
+# Root directory ko path me add kiya taaki root me rakhi actions_data.py load ho jaye
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+try:
+    from actions_data import ACTION_GIFS
+except ImportError:
+    ACTION_GIFS = {}
 
 class ActionsCog(commands.Cog):
     def __init__(self, bot):
@@ -25,8 +34,8 @@ class ActionsCog(commands.Cog):
             await interaction.response.send_message("❌ You can't do that to yourself!", ephemeral=True)
             return
 
-        # Get random GIF
-        gifs = ACTION_GIFS.get(action.lower(), ["https://placeholder.com/gif.gif"])
+        # Get random GIF from actions_data.py
+        gifs = ACTION_GIFS.get(action.lower(), ["https://media.giphy.com/media/l2QDM9Jnim1YV55YA/giphy.gif"])
         gif_url = random.choice(gifs)
 
         # Create embed
@@ -101,3 +110,4 @@ class ActionsCog(commands.Cog):
 
 async def setup(bot):
     await bot.add_cog(ActionsCog(bot))
+        
