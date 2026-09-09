@@ -2,6 +2,8 @@ import discord
 from discord.ext import commands
 from discord import app_commands
 import random
+import aiohttp
+import asyncio
 
 # Complete 110 GIFs Dictionary (Single File Architecture)
 ACTION_GIFS = {
@@ -139,9 +141,62 @@ ACTION_GIFS = {
     ]
 }
 
+# Guaranteed-working fallback if every candidate in a category turns out dead
+FALLBACK_GIF = "https://media.tenor.com/gbf398P3xTEAAAAC/hug-anime.gif"
+
+
 class ActionsCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
+        self._validate_session: aiohttp.ClientSession | None = None
+        # Cache of URL -> bool so we don't re-check the same link every time
+        self._link_status_cache: dict[str, bool] = {}
+
+    async def cog_load(self):
+        self._validate_session = aiohttp.ClientSession()
+
+    async def cog_unload(self):
+        if self._validate_session and not self._validate_session.closed:
+            await self._validate_session.close()
+
+    async def _is_link_alive(self, url: str) -> bool:
+        """Quick HEAD check (with GET fallback) so we never send a dead GIF link."""
+        if url in self._link_status_cache:
+            return self._link_status_cache[url]
+
+        alive = False
+        try:
+            async with self._validate_session.head(url, timeout=aiohttp.ClientTimeout(total=3), allow_redirects=True) as resp:
+                content_type = resp.headers.get("Content-Type", "")
+                alive = resp.status == 200 and content_type.startswith("image")
+        except Exception:
+            # Some CDNs don't support HEAD properly — fall back to a light GET
+            try:
+                async with self._validate_session.get(url, timeout=aiohttp.ClientTimeout(total=3)) as resp:
+                    content_type = resp.headers.get("Content-Type", "")
+                    alive = resp.status == 200 and content_type.startswith("image")
+            except Exception:
+                alive = False
+
+        self._link_status_cache[url] = alive
+        return alive
+
+    async def _pick_working_gif(self, action: str) -> str:
+        """Shuffle the category's GIFs and return the first one that's actually alive."""
+        candidates = ACTION_GIFS.get(action, [])
+        if not candidates:
+            return FALLBACK_GIF
+
+        shuffled = candidates.copy()
+        random.shuffle(shuffled)
+
+        # Try up to 4 candidates before giving up and using the fallback —
+        # keeps latency bounded even if several links in a row are dead.
+        for url in shuffled[:4]:
+            if await self._is_link_alive(url):
+                return url
+
+        return FALLBACK_GIF
 
     ACTION_TEXTS = {
         'doom': lambda author, target: f"🚀💥 {author.mention} launched a missile strike and DOOMED {target.mention}!",
@@ -158,31 +213,24 @@ class ActionsCog(commands.Cog):
             return
 
         act_key = action.lower()
-        
-        # Fallback GIF if list is empty
-        fallback_gif = "https://media.tenor.com/gbf398P3xTEAAAAC/hug-anime.gif"
-        
-        # Get random GIF URL from your 110 GIF dictionary
-        gif_list = ACTION_GIFS.get(act_key, [fallback_gif])
-        selected_gif = random.choice(gif_list) if gif_list else fallback_gif
 
-        # Generate custom text
+        # Defer since the link-validation HEAD/GET check can take a moment
+        # and we don't want to risk missing Discord's 3s interaction window.
+        await interaction.response.defer()
+
+        selected_gif = await self._pick_working_gif(act_key)
+
         if act_key in self.ACTION_TEXTS:
             text = self.ACTION_TEXTS[act_key](interaction.user, target)
         else:
             text = f"{interaction.user.mention} {act_key}ed {target.mention}!"
 
-        # Create embed
         embed = discord.Embed(description=text, color=discord.Color.teal())
-        
-        # Ye line direct embed ke andar as a large image GIF render karegi
         embed.set_image(url=selected_gif)
-        
         embed.set_footer(text=f"Requested by {interaction.user.display_name}", icon_url=interaction.user.display_avatar.url)
 
-        # Sirf embed send karna hai, content attribute hata diya gaya hai
-        await interaction.response.send_message(embed=embed)
-    
+        await interaction.followup.send(embed=embed)
+
     # Command Definitions
     @app_commands.command(name="hug", description="Give someone a warm hug!")
     async def hug(self, interaction: discord.Interaction, target: discord.Member):
@@ -228,6 +276,6 @@ class ActionsCog(commands.Cog):
     async def pie(self, interaction: discord.Interaction, target: discord.Member):
         await self.perform_action(interaction, "pie", target)
 
+
 async def setup(bot):
     await bot.add_cog(ActionsCog(bot))
-    
