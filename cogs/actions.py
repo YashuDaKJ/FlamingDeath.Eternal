@@ -159,10 +159,10 @@ class ActionsCog(commands.Cog):
 
         act_key = action.lower()
         
-        # Fallback GIF if list fetch encounters broken link
+        # Fallback GIF if list is empty
         fallback_gif = "https://media.tenor.com/gbf398P3xTEAAAAC/hug-anime.gif"
         
-        # Get random GIF URL from dictionary
+        # Get random GIF URL from your 110 GIF dictionary
         gif_list = ACTION_GIFS.get(act_key, [fallback_gif])
         selected_gif = random.choice(gif_list) if gif_list else fallback_gif
 
@@ -174,12 +174,15 @@ class ActionsCog(commands.Cog):
 
         # Create embed
         embed = discord.Embed(description=text, color=discord.Color.teal())
+        
+        # Ye line direct embed ke andar as a large image GIF render karegi
         embed.set_image(url=selected_gif)
+        
         embed.set_footer(text=f"Requested by {interaction.user.display_name}", icon_url=interaction.user.display_avatar.url)
 
-        # Dual delivery: Passing URL in content guarantees rendering even if embed block fails
-        await interaction.response.send_message(content=selected_gif, embed=embed)
-
+        # Sirf embed send karna hai, content attribute hata diya gaya hai
+        await interaction.response.send_message(embed=embed)
+    
     # Command Definitions
     @app_commands.command(name="hug", description="Give someone a warm hug!")
     async def hug(self, interaction: discord.Interaction, target: discord.Member):
