@@ -17,17 +17,17 @@ CACHE_TTL_SECONDS = 30 * 60
 
 # Search queries optimized for 100% anime style and dramatic action effects
 ACTION_QUERIES = {
-    "hug": "anime hug wholesome",
-    "punch": "anime punch action",
+    "hug": "anime hug",
+    "punch": "anime punch",
     "pat": "anime head pat cute",
-    "slap": "anime slap funny",
-    "doom": "anime ultimate attack explosion",
-    "burn": "anime fire flame attack",
-    "blast": "anime explosion blast",
+    "slap": "anime slap",
+    "doom": "anime explosion",
+    "burn": "anime fire attack",
+    "blast": "anime blast",
     "highfive": "anime high five",
-    "cake": "anime cake smash face",
+    "cake": "anime cake smash",
     "spray": "anime party spray",
-    "pie": "anime throw pie face comedy",
+    "pie": "anime throw pie",
 }
 
 
