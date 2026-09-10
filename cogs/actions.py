@@ -6,25 +6,28 @@ import time
 import os
 import aiohttp
 
+# Fallback link in case Giphy API fails or key is missing
 FALLBACK_GIF = "https://media.tenor.com/gbf398P3xTEAAAAC/hug-anime.gif"
 
+# Environment Variable for Giphy API Key
 GIPHY_API_KEY = os.getenv("GIPHY_API_KEY")
 
-CACHE_TTL_SECONDS = 30 * 60  # 30 minutes
+# In-Memory Cache Duration (30 Minutes)
+CACHE_TTL_SECONDS = 30 * 60
 
-# Updated queries for 100% anime style and dramatic action effects
+# Search queries optimized for 100% anime style and dramatic action effects
 ACTION_QUERIES = {
     "hug": "anime hug wholesome",
     "punch": "anime punch action",
     "pat": "anime head pat cute",
-    "slap": "anime slap dramatic",
+    "slap": "anime slap funny",
     "doom": "anime ultimate attack explosion",
     "burn": "anime fire flame attack",
     "blast": "anime explosion blast",
-    "highfive": "anime high five team",
+    "highfive": "anime high five",
     "cake": "anime cake smash face",
-    "spray": "anime water spray party",
-    "pie": "anime pie face comedy",
+    "spray": "anime party spray",
+    "pie": "anime throw pie face comedy",
 }
 
 
@@ -32,18 +35,20 @@ class ActionsCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.session: aiohttp.ClientSession | None = None
+        # Internal cache: action_name -> (fetch_timestamp, [list_of_urls])
         self._cache: dict[str, tuple[float, list[str]]] = {}
 
     async def cog_load(self):
         self.session = aiohttp.ClientSession()
         if not GIPHY_API_KEY:
-            print("⚠️ GIPHY_API_KEY not set — all GIF commands will use the static fallback.", flush=True)
+            print("⚠️ GIPHY_API_KEY is not set! Bot will fallback to static GIF link.", flush=True)
 
     async def cog_unload(self):
         if self.session and not self.session.closed:
             await self.session.close()
 
     async def _fetch_batch(self, action: str) -> list[str]:
+        """Fetch a batch of 25 GIFs for the requested action query from Giphy."""
         query = ACTION_QUERIES.get(action, f"anime {action}")
         try:
             url = "https://api.giphy.com/v1/gifs/search"
@@ -55,13 +60,14 @@ class ActionsCog(commands.Cog):
             }
             async with self.session.get(url, params=params, timeout=aiohttp.ClientTimeout(total=5)) as resp:
                 if resp.status != 200:
-                    print(f"⚠️ Giphy API returned {resp.status} for '{query}'", flush=True)
+                    print(f"⚠️ Giphy API returned status {resp.status} for query '{query}'", flush=True)
                     return []
                 data = await resp.json()
                 results = data.get("data", [])
                 urls = []
                 for item in results:
                     images = item.get("images", {})
+                    # Select downsized GIF or fall back to original endpoint
                     candidate = (
                         images.get("downsized", {}).get("url")
                         or images.get("original", {}).get("url")
@@ -70,24 +76,28 @@ class ActionsCog(commands.Cog):
                         urls.append(candidate)
                 return urls
         except Exception as e:
-            print(f"⚠️ Giphy fetch failed for '{query}': {e}", flush=True)
+            print(f"⚠️ Giphy API request failed for '{query}': {e}", flush=True)
             return []
 
     async def get_gif(self, action: str) -> str:
+        """Retrieve a cached GIF or fetch a new batch if stale/empty."""
         if not GIPHY_API_KEY:
             return FALLBACK_GIF
 
         now = time.time()
         cached = self._cache.get(action)
 
+        # Serve from cache if available and within TTL
         if cached and (now - cached[0]) < CACHE_TTL_SECONDS and cached[1]:
             return random.choice(cached[1])
 
+        # Cache expired or empty -> fetch fresh batch
         urls = await self._fetch_batch(action)
         if urls:
             self._cache[action] = (now, urls)
             return random.choice(urls)
 
+        # Serve stale cache if API call failed, otherwise fallback
         if cached and cached[1]:
             return random.choice(cached[1])
         return FALLBACK_GIF
@@ -103,9 +113,10 @@ class ActionsCog(commands.Cog):
 
     async def perform_action(self, interaction: discord.Interaction, action: str, target: discord.Member):
         if target.id == interaction.user.id:
-            await interaction.response.send_message("❌ You can't do that to yourself!", ephemeral=True)
+            await interaction.response.send_message("❌ You can't perform this action on yourself!", ephemeral=True)
             return
 
+        # Defer interaction to avoid 3-second timeout limits
         await interaction.response.defer()
         act_key = action.lower()
 
@@ -118,10 +129,14 @@ class ActionsCog(commands.Cog):
 
         embed = discord.Embed(description=text, color=discord.Color.teal())
         embed.set_image(url=selected_gif)
-        embed.set_footer(text=f"Requested by {interaction.user.display_name}", icon_url=interaction.user.display_avatar.url)
+        embed.set_footer(
+            text=f"Requested by {interaction.user.display_name}", 
+            icon_url=interaction.user.display_avatar.url
+        )
 
         await interaction.followup.send(embed=embed)
 
+    # 11 Discord Slash Commands
     @app_commands.command(name="hug", description="Give someone a warm hug!")
     async def hug(self, interaction: discord.Interaction, target: discord.Member):
         await self.perform_action(interaction, "hug", target)
@@ -169,4 +184,4 @@ class ActionsCog(commands.Cog):
 
 async def setup(bot):
     await bot.add_cog(ActionsCog(bot))
-                      
+        
