@@ -37,11 +37,11 @@ def build_help_embed() -> discord.Embed:
     )
 
     embed.add_field(
-        name="🎭 Action & Roleplay Commands",
+        name="🎭 Action & Anime Roleplay Commands",
         value=(
-            "⚔️ **Combat & Roleplay:** `/hug`, `/punch`, `/pat`, `/slap`, `/doom`, `/burn`, `/blast`, `/highfive`\n"
-            "🎉 **Fun & Party:** `/cake`, `/spray`, `/pie`\n"
-            "*(Usage: `/doom @user` or `!flamy doom @user`)*"
+            "⚔️ **Combat & Actions:** `/hug`, `/punch`, `/pat`, `/slap`, `/highfive`\n"
+            "✨ **Anime Tropes:** `/yeet`, `/dodge`, `/aura`, `/flex`, `/annoying`, `/rizz`, `/hello`\n"
+            "*(Usage: `/yeet @user` or `/rizz @user`)*"
         ),
         inline=False
     )
@@ -360,4 +360,4 @@ class FactionBotCommands(commands.Cog):
 
 async def setup(bot):
     await bot.add_cog(FactionBotCommands(bot))
-                                            
+    
