@@ -15,17 +15,17 @@ GIPHY_API_KEY = os.getenv("GIPHY_API_KEY")
 # In-Memory Cache Duration (30 Minutes)
 CACHE_TTL_SECONDS = 30 * 60
 
-# Updated search queries for pure anime action & tropes
+# Search queries optimized for pure anime action & tropes
 ACTION_QUERIES = {
     "hug": "anime hug",
     "punch": "anime punch",
     "pat": "anime head pat cute",
-    "slap": "anime slap",
+    "slap": "anime slap face",
     "highfive": "anime high five",
     "yeet": "anime throw yeet",
     "dodge": "anime dodge attack",
-    "aura": "anime aura",
-    "flex": "anime flex",
+    "aura": "anime power aura",
+    "flex": "anime flex muscle",
     "annoying": "anime poke annoying",
     "rizz": "anime rizz flirt smirk",
     "hello": "anime wave hello cute",
@@ -56,7 +56,7 @@ class ActionsCog(commands.Cog):
             params = {
                 "api_key": GIPHY_API_KEY,
                 "q": query,
-                "limit": 35,  # Fetching slightly more items to filter out non-anime ones safely
+                "limit": 35,
                 "rating": "pg-13",
             }
             async with self.session.get(url, params=params, timeout=aiohttp.ClientTimeout(total=5)) as resp:
@@ -70,8 +70,7 @@ class ActionsCog(commands.Cog):
                     title = item.get("title", "").lower()
                     slug = item.get("slug", "").lower()
                     
-                    # STRICT OPTION 2 FILTER: Ensure the GIF title or slug contains 'anime' 
-                    # to eliminate random real-life cat/dog/movie GIFs.
+                    # STRICT FILTER: Ensure title/slug contains 'anime'
                     if "anime" in title or "anime" in slug:
                         images = item.get("images", {})
                         candidate = (
@@ -81,7 +80,7 @@ class ActionsCog(commands.Cog):
                         if candidate:
                             urls.append(candidate)
                 
-                # If strict filtering returned no results, fall back to unfiltered candidates from the batch
+                # If strict filtering returned no results, fall back to unfiltered batch
                 if not urls:
                     for item in results:
                         images = item.get("images", {})
@@ -98,26 +97,29 @@ class ActionsCog(commands.Cog):
             return []
 
     async def get_gif(self, action: str) -> str:
-        """Retrieve a cached GIF or fetch a new batch if stale/empty."""
+        """Retrieve a cached GIF or fetch a new batch and select ONLY from the top 10 results."""
         if not GIPHY_API_KEY:
             return FALLBACK_GIF
 
         now = time.time()
         cached = self._cache.get(action)
 
-        # Serve from cache if available and within TTL
+        # Serve from cache (Top 10 only)
         if cached and (now - cached[0]) < CACHE_TTL_SECONDS and cached[1]:
-            return random.choice(cached[1])
+            top_10 = cached[1][:10]
+            return random.choice(top_10)
 
-        # Cache expired or empty -> fetch fresh batch
+        # Cache expired/empty -> fetch fresh batch
         urls = await self._fetch_batch(action)
         if urls:
             self._cache[action] = (now, urls)
-            return random.choice(urls)
+            top_10 = urls[:10]
+            return random.choice(top_10)
 
-        # Serve stale cache if API call failed, otherwise fallback
+        # Serve stale cache fallback (Top 10 only)
         if cached and cached[1]:
-            return random.choice(cached[1])
+            top_10 = cached[1][:10]
+            return random.choice(top_10)
         return FALLBACK_GIF
 
     ACTION_TEXTS = {
@@ -135,7 +137,6 @@ class ActionsCog(commands.Cog):
             await interaction.response.send_message("❌ You can't perform this action on yourself!", ephemeral=True)
             return
 
-        # Defer interaction to avoid 3-second timeout limits
         await interaction.response.defer()
         act_key = action.lower()
 
@@ -207,4 +208,4 @@ class ActionsCog(commands.Cog):
 
 async def setup(bot):
     await bot.add_cog(ActionsCog(bot))
-    
+                            
