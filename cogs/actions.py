@@ -2,33 +2,25 @@ import discord
 from discord.ext import commands
 from discord import app_commands
 import random
-import time
-import os
 import aiohttp
 
-# Fallback link in case Giphy API fails or key is missing
+# Fallback link in case Network API fails
 FALLBACK_GIF = "https://media.tenor.com/gbf398P3xTEAAAAC/hug-anime.gif"
 
-# Environment Variable for Giphy API Key
-GIPHY_API_KEY = os.getenv("GIPHY_API_KEY")
-
-# In-Memory Cache Duration (30 Minutes)
-CACHE_TTL_SECONDS = 30 * 60
-
-# Search queries optimized for pure anime action & tropes
-ACTION_QUERIES = {
-    "hug": "anime hug anime",
-    "punch": "anime punch",
-    "pat": "anime head pat cute",
-    "slap": "anime slap face",
-    "highfive": "anime high five",
-    "yeet": "anime throw yeet",
-    "dodge": "anime dodge attack",
-    "aura": "anime power aura",
-    "flex": "anime flex",
-    "annoying": "anime poke annoying",
-    "rizz": "anime rizz",
-    "hello": "anime wave hello cute",
+# Mapping Discord action names to nekos.best API endpoints
+NEKOS_ACTIONS = {
+    "hug": "hug",
+    "punch": "punch",
+    "pat": "pat",
+    "slap": "slap",
+    "highfive": "highfive",
+    "yeet": "yeet",
+    "dodge": "dodge",
+    "aura": "shoot",       # High power energy/aura alternative
+    "flex": "bored",       # Playful flex alternative
+    "annoying": "poke",    # Poke / annoying action
+    "rizz": "smug",        # Smug anime expression for rizz
+    "hello": "wave",       # Waving hello
 }
 
 
@@ -36,100 +28,39 @@ class ActionsCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.session: aiohttp.ClientSession | None = None
-        # Internal cache: action_name -> (fetch_timestamp, [list_of_urls])
-        self._cache: dict[str, tuple[float, list[str]]] = {}
 
     async def cog_load(self):
         self.session = aiohttp.ClientSession()
-        if not GIPHY_API_KEY:
-            print("⚠️ GIPHY_API_KEY is not set! Bot will fallback to static GIF link.", flush=True)
 
     async def cog_unload(self):
         if self.session and not self.session.closed:
             await self.session.close()
 
-    async def _fetch_batch(self, action: str) -> list[str]:
-        """Fetch a batch of GIFs for the requested action query from Giphy with strict Anime filtering."""
-        query = ACTION_QUERIES.get(action, f"anime {action}")
+    async def get_anime_gif(self, action: str) -> str:
+        """Fetch a guaranteed high-quality anime GIF from nekos.best API."""
+        category = NEKOS_ACTIONS.get(action.lower(), "hug")
+        url = f"https://nekos.best/api/v2/{category}"
+        
         try:
-            url = "https://api.giphy.com/v1/gifs/search"
-            params = {
-                "api_key": GIPHY_API_KEY,
-                "q": query,
-                "limit": 35,
-                "rating": "pg-13",
-            }
-            async with self.session.get(url, params=params, timeout=aiohttp.ClientTimeout(total=5)) as resp:
-                if resp.status != 200:
-                    print(f"⚠️ Giphy API returned status {resp.status} for query '{query}'", flush=True)
-                    return []
-                data = await resp.json()
-                results = data.get("data", [])
-                urls = []
-                for item in results:
-                    title = item.get("title", "").lower()
-                    slug = item.get("slug", "").lower()
-                    
-                    # STRICT FILTER: Ensure title/slug contains 'anime'
-                    if "anime" in title or "anime" in slug:
-                        images = item.get("images", {})
-                        candidate = (
-                            images.get("downsized", {}).get("url")
-                            or images.get("original", {}).get("url")
-                        )
-                        if candidate:
-                            urls.append(candidate)
-                
-                # If strict filtering returned no results, fall back to unfiltered batch
-                if not urls:
-                    for item in results:
-                        images = item.get("images", {})
-                        candidate = (
-                            images.get("downsized", {}).get("url")
-                            or images.get("original", {}).get("url")
-                        )
-                        if candidate:
-                            urls.append(candidate)
-
-                return urls
+            async with self.session.get(url, timeout=aiohttp.ClientTimeout(total=5)) as resp:
+                if resp.status == 200:
+                    data = await resp.json()
+                    results = data.get("results", [])
+                    if results:
+                        return results[0].get("url", FALLBACK_GIF)
         except Exception as e:
-            print(f"⚠️ Giphy API request failed for '{query}': {e}", flush=True)
-            return []
+            print(f"⚠️ Nekos API Request Error for '{category}': {e}", flush=True)
 
-    async def get_gif(self, action: str) -> str:
-        """Retrieve a cached GIF or fetch a new batch and select ONLY from the top 10 results."""
-        if not GIPHY_API_KEY:
-            return FALLBACK_GIF
-
-        now = time.time()
-        cached = self._cache.get(action)
-
-        # Serve from cache (Top 10 only)
-        if cached and (now - cached[0]) < CACHE_TTL_SECONDS and cached[1]:
-            top_10 = cached[1][:10]
-            return random.choice(top_10)
-
-        # Cache expired/empty -> fetch fresh batch
-        urls = await self._fetch_batch(action)
-        if urls:
-            self._cache[action] = (now, urls)
-            top_10 = urls[:10]
-            return random.choice(top_10)
-
-        # Serve stale cache fallback (Top 10 only)
-        if cached and cached[1]:
-            top_10 = cached[1][:10]
-            return random.choice(top_10)
         return FALLBACK_GIF
 
     ACTION_TEXTS = {
         'yeet': lambda author, target: f"💨 {author.mention} YEETED {target.mention} into the stratosphere!",
         'dodge': lambda author, target: f"⚡ {author.mention} effortlessly DODGED {target.mention}'s attack with Ultra Instinct!",
-        'aura': lambda author, target: f"✨ {author.mention} unleashed an overwhelming AURA in front of {target.mention}!",
+        'aura': lambda author, target: f"✨ {author.mention} unleashed an overwhelming anime AURA in front of {target.mention}!",
         'flex': lambda author, target: f"💪 {author.mention} FLEXED their supreme power on {target.mention}!",
         'annoying': lambda author, target: f"🤪 {author.mention} is continuously ANNOYING {target.mention}!",
-        'rizz': lambda author, target: f"😏 {author.mention} deployed lightspeed RIZZ on {target.mention}!",
-        'hello': lambda author, target: f"👋 {author.mention} gave a sweet HELLO wave to {target.mention}!",
+        'rizz': lambda author, target: f"😏 {author.mention} deployed lightspeed ANIME RIZZ on {target.mention}!",
+        'hello': lambda author, target: f"👋 {author.mention} gave a sweet anime HELLO wave to {target.mention}!",
     }
 
     async def perform_action(self, interaction: discord.Interaction, action: str, target: discord.Member):
@@ -137,10 +68,11 @@ class ActionsCog(commands.Cog):
             await interaction.response.send_message("❌ You can't perform this action on yourself!", ephemeral=True)
             return
 
+        # Defer interaction to avoid 3-second timeout limits
         await interaction.response.defer()
         act_key = action.lower()
 
-        selected_gif = await self.get_gif(act_key)
+        selected_gif = await self.get_anime_gif(act_key)
 
         if act_key in self.ACTION_TEXTS:
             text = self.ACTION_TEXTS[act_key](interaction.user, target)
@@ -208,4 +140,4 @@ class ActionsCog(commands.Cog):
 
 async def setup(bot):
     await bot.add_cog(ActionsCog(bot))
-                            
+    
