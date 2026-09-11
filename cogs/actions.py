@@ -17,7 +17,7 @@ CACHE_TTL_SECONDS = 30 * 60
 
 # Search queries optimized for pure anime action & tropes
 ACTION_QUERIES = {
-    "hug": "anime hug",
+    "hug": "anime hug anime",
     "punch": "anime punch",
     "pat": "anime head pat cute",
     "slap": "anime slap face",
@@ -25,9 +25,9 @@ ACTION_QUERIES = {
     "yeet": "anime throw yeet",
     "dodge": "anime dodge attack",
     "aura": "anime power aura",
-    "flex": "anime flex muscle",
+    "flex": "anime flex",
     "annoying": "anime poke annoying",
-    "rizz": "anime rizz flirt smirk",
+    "rizz": "anime rizz",
     "hello": "anime wave hello cute",
 }
 
