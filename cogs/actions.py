@@ -20,15 +20,15 @@ ACTION_QUERIES = {
     "hug": "anime hug",
     "punch": "anime punch",
     "pat": "anime head pat cute",
-    "slap": "anime slap anime",
+    "slap": "anime slap",
     "highfive": "anime high five",
     "yeet": "anime throw yeet",
-    "dodge": "anime dodge anime",
-    "aura": "anime aura anime",
-    "flex": "anime flexing anime",
-    "annoying": "anime annoying anime",
+    "dodge": "anime dodge attack",
+    "aura": "anime aura",
+    "flex": "anime flex",
+    "annoying": "anime poke annoying",
     "rizz": "anime rizz flirt smirk",
-    "hello": "anime wave hello cute anime",
+    "hello": "anime wave hello cute",
 }
 
 
@@ -49,14 +49,14 @@ class ActionsCog(commands.Cog):
             await self.session.close()
 
     async def _fetch_batch(self, action: str) -> list[str]:
-        """Fetch a batch of 25 GIFs for the requested action query from Giphy."""
+        """Fetch a batch of GIFs for the requested action query from Giphy with strict Anime filtering."""
         query = ACTION_QUERIES.get(action, f"anime {action}")
         try:
             url = "https://api.giphy.com/v1/gifs/search"
             params = {
                 "api_key": GIPHY_API_KEY,
                 "q": query,
-                "limit": 25,
+                "limit": 35,  # Fetching slightly more items to filter out non-anime ones safely
                 "rating": "pg-13",
             }
             async with self.session.get(url, params=params, timeout=aiohttp.ClientTimeout(total=5)) as resp:
@@ -67,13 +67,31 @@ class ActionsCog(commands.Cog):
                 results = data.get("data", [])
                 urls = []
                 for item in results:
-                    images = item.get("images", {})
-                    candidate = (
-                        images.get("downsized", {}).get("url")
-                        or images.get("original", {}).get("url")
-                    )
-                    if candidate:
-                        urls.append(candidate)
+                    title = item.get("title", "").lower()
+                    slug = item.get("slug", "").lower()
+                    
+                    # STRICT OPTION 2 FILTER: Ensure the GIF title or slug contains 'anime' 
+                    # to eliminate random real-life cat/dog/movie GIFs.
+                    if "anime" in title or "anime" in slug:
+                        images = item.get("images", {})
+                        candidate = (
+                            images.get("downsized", {}).get("url")
+                            or images.get("original", {}).get("url")
+                        )
+                        if candidate:
+                            urls.append(candidate)
+                
+                # If strict filtering returned no results, fall back to unfiltered candidates from the batch
+                if not urls:
+                    for item in results:
+                        images = item.get("images", {})
+                        candidate = (
+                            images.get("downsized", {}).get("url")
+                            or images.get("original", {}).get("url")
+                        )
+                        if candidate:
+                            urls.append(candidate)
+
                 return urls
         except Exception as e:
             print(f"⚠️ Giphy API request failed for '{query}': {e}", flush=True)
@@ -105,11 +123,11 @@ class ActionsCog(commands.Cog):
     ACTION_TEXTS = {
         'yeet': lambda author, target: f"💨 {author.mention} YEETED {target.mention} into the stratosphere!",
         'dodge': lambda author, target: f"⚡ {author.mention} effortlessly DODGED {target.mention}'s attack with Ultra Instinct!",
-        'aura': lambda author, target: f"✨ {author.mention} unleashed an overwhelming anime AURA in front of {target.mention}!",
+        'aura': lambda author, target: f"✨ {author.mention} unleashed an overwhelming AURA in front of {target.mention}!",
         'flex': lambda author, target: f"💪 {author.mention} FLEXED their supreme power on {target.mention}!",
         'annoying': lambda author, target: f"🤪 {author.mention} is continuously ANNOYING {target.mention}!",
-        'rizz': lambda author, target: f"😏 {author.mention} deployed lightspeed ANIME RIZZ on {target.mention}!",
-        'hello': lambda author, target: f"👋 {author.mention} gave a sweet anime HELLO wave to {target.mention}!",
+        'rizz': lambda author, target: f"😏 {author.mention} deployed lightspeed RIZZ on {target.mention}!",
+        'hello': lambda author, target: f"👋 {author.mention} gave a sweet HELLO wave to {target.mention}!",
     }
 
     async def perform_action(self, interaction: discord.Interaction, action: str, target: discord.Member):
@@ -189,4 +207,4 @@ class ActionsCog(commands.Cog):
 
 async def setup(bot):
     await bot.add_cog(ActionsCog(bot))
-                    
+    
