@@ -42,10 +42,9 @@ def build_help_embed() -> discord.Embed:
             "⚔️ **Combat Actions:** `kick`, `nuke`, `bonk`, `punch`, `slap`, `yeet`, `dodge`\n"
             "✨ **Anime Tropes & Flex:** `aura`, `flex`, `annoying`, `rizz`, `stare`, `glare`\n"
             "🥐 **Social & Daily Vibes:** `hug`, `pat`, `highfive`, `feed`, `tickle`, `hello`, `goodmorning`, `goodnight`!\n\n"
-            "🔥 **3 Ways to Use (Supports Caps & Small text):**\n"
-            "1️⃣ **Prefix:** `!flamy kick @user` or `!FLAMY NUKE @user`\n"
-            "2️⃣ **Slash Command:** `/flamy kick` or `/flamy nuke`\n"
-            "3️⃣ **Direct Text:** `flamy kick @user` or `FLAMY KICK @user`"
+            "🔥 **2 Ways to Use (Supports Caps & Small text):**\n"
+            "1️⃣ **Slash Command (recommended):** `/kick @user`, `/nuke @user`, etc. — directly, no `/flamy` needed\n"
+            "2️⃣ **Direct Text:** `flamy kick @user` or `FLAMY KICK @user`"
         ),
         inline=False
     )
@@ -365,4 +364,3 @@ class FactionBotCommands(commands.Cog):
 
 async def setup(bot):
     await bot.add_cog(FactionBotCommands(bot))
-    
