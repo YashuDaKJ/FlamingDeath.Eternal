@@ -39,9 +39,13 @@ def build_help_embed() -> discord.Embed:
     embed.add_field(
         name="🎭 Action & Anime Roleplay Commands",
         value=(
-            "⚔️ **Combat & Actions:** `/hug`, `/punch`, `/pat`, `/slap`, `/highfive`\n"
-            "✨ **Anime Tropes:** `/yeet`, `/dodge`, `/aura`, `/flex`, `/annoying`, `/rizz`, `/hello`\n"
-            "*(Usage: `/yeet @user` or `/rizz @user`)*"
+            "⚔️ **Combat Actions:** `kick`, `nuke`, `bonk`, `punch`, `slap`, `yeet`, `dodge`\n"
+            "✨ **Anime Tropes & Flex:** `aura`, `flex`, `annoying`, `rizz`, `stare`, `glare`\n"
+            "🥐 **Social & Daily Vibes:** `hug`, `pat`, `highfive`, `feed`, `tickle`, `hello`, `goodmorning`, `goodnight`!\n\n"
+            "🔥 **3 Ways to Use (Supports Caps & Small text):**\n"
+            "1️⃣ **Prefix:** `!flamy kick @user` or `!FLAMY NUKE @user`\n"
+            "2️⃣ **Slash Command:** `/flamy kick` or `/flamy nuke`\n"
+            "3️⃣ **Direct Text:** `flamy kick @user` or `FLAMY KICK @user`"
         ),
         inline=False
     )
@@ -128,7 +132,7 @@ def build_help_embed() -> discord.Embed:
         inline=False
     )
 
-    embed.set_footer(text="Guarding Eternal Faction | Type !flamy help anytime")
+    embed.set_footer(text="Guarding Eternal Faction | Type !flamy help or flamy help anytime")
     return embed
 
 class FactionBotCommands(commands.Cog):
@@ -141,7 +145,8 @@ class FactionBotCommands(commands.Cog):
         if message.author.bot:
             return
 
-        if message.content.lower().strip() == "!flamy help":
+        msg_clean = message.content.lower().strip()
+        if msg_clean in ["!flamy help", "flamy help", "/flamy help"]:
             embed = build_help_embed()
             await message.channel.send(embed=embed)
 
