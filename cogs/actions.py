@@ -154,22 +154,15 @@ class ActionsCog(commands.Cog):
               f"({len(self.categories) - len(chosen)} more available via !flamy / text-trigger only).", flush=True)
 
     def _add_dynamic_slash(self, category: str):
-        async def _callback(interaction: discord.Interaction, target: discord.Member | None = None):
+        verb = DISPLAY_NAME_OVERRIDES.get(category, category)
+        command_desc = COMMAND_DESCRIPTIONS.get(category, f"[FlamingDeath] {verb} someone!")
+
+        @app_commands.command(name=category, description=command_desc[:100])
+        async def _cmd(interaction: discord.Interaction, target: discord.Member | None = None):
             await interaction.response.defer()
             await self._send_action(interaction.followup.send, interaction.user, category, target)
 
-        _callback.__name__ = category
-        verb = DISPLAY_NAME_OVERRIDES.get(category, category)
-
-        # Using the mapped description or falling back to a generic one
-        command_desc = COMMAND_DESCRIPTIONS.get(category, f"[FlamingDeath] {verb} someone!")
-
-        cmd = app_commands.Command(
-            name=category,
-            description=command_desc[:100],  # Ensuring it stays within Discord's 100 char limit
-            callback=_callback,
-        )
-        self.bot.tree.add_command(cmd)
+        self.bot.tree.add_command(_cmd)
         self._registered_slash_names.append(category)
 
     async def cog_unload(self):
