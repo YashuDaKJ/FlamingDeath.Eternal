@@ -95,7 +95,6 @@ FLAMINGDEATH_TEXTS = {
     "kick": lambda a, t: f"🦶 **[FlamingDeath Broadcast]** BOOM! {a.mention} kicked {t.mention if t else 'an imaginary target'} straight through the server wall!",
 }
 
-# Friendlier display names for categories
 DISPLAY_NAME_OVERRIDES = {
     "blowkiss": "blow a kiss to",
     "handhold": "hold hands with",
@@ -103,11 +102,9 @@ DISPLAY_NAME_OVERRIDES = {
     "facepalm": "facepalm at",
 }
 
-
 def _default_text(category: str):
     verb = DISPLAY_NAME_OVERRIDES.get(category, category)
     return lambda a, t: f"🔥 **[FlamingDeath Broadcast]** {a.mention} used **{verb}** on {t.mention if t else 'everyone'}!"
-
 
 class ActionsCog(commands.Cog):
     def __init__(self, bot):
@@ -157,17 +154,27 @@ class ActionsCog(commands.Cog):
         verb = DISPLAY_NAME_OVERRIDES.get(category, category)
         command_desc = COMMAND_DESCRIPTIONS.get(category, f"[FlamingDeath] {verb} someone!")
 
-        @app_commands.command(name=category, description=command_desc[:100])
-        async def _cmd(interaction: discord.Interaction, target: discord.Member | None = None):
+        async def _callback(interaction: discord.Interaction, target: discord.Member | None = None):
             await interaction.response.defer()
             await self._send_action(interaction.followup.send, interaction.user, category, target)
 
-        self.bot.tree.add_command(_cmd)
+        _callback.__name__ = category
+        cmd = app_commands.Command(
+            name=category,
+            description=command_desc[:100],
+            callback=_callback,
+        )
+        self.bot.tree.add_command(cmd)
         self._registered_slash_names.append(category)
 
     async def cog_unload(self):
+        # Remove dynamically added slash commands
         for name in getattr(self, "_registered_slash_names", []):
             self.bot.tree.remove_command(name)
+        
+        # Remove dynamically added prefix group
+        self.bot.remove_command("flamy")
+        
         if self.session and not self.session.closed:
             await self.session.close()
 
@@ -230,25 +237,24 @@ class ActionsCog(commands.Cog):
                 await self._send_action(message.channel.send, message.author, action, target)
 
     def _register_prefix_group(self):
-        group = commands.Group(name="flamy", invoke_without_command=True, case_insensitive=True)
-
+        # The main issue was here: 'flamy_root' needed to be passed directly as the first argument 'func'
         async def flamy_root(ctx: commands.Context):
             names = ", ".join(sorted(self.categories.keys()))
             await ctx.send(f"🔥 **[FlamingDeath]** Available actions ({len(self.categories)}):\n`{names}`")
 
-        group.callback = flamy_root
+        group = commands.Group(flamy_root, name="flamy", invoke_without_command=True, case_insensitive=True)
 
-        def make_subcommand(category: str):
+        def make_subcommand(cat_name: str):
             async def _cmd(ctx: commands.Context, target: discord.Member | None = None):
-                await self._send_action(ctx.send, ctx.author, category, target)
-            _cmd.__name__ = f"flamy_{category}"
-            return group.command(name=category)(_cmd)
+                await self._send_action(ctx.send, ctx.author, cat_name, target)
+            _cmd.__name__ = f"flamy_{cat_name}"
+            # Same here: '_cmd' is passed as the first argument
+            return commands.Command(_cmd, name=cat_name)
 
         for category in self.categories:
-            make_subcommand(category)
+            group.add_command(make_subcommand(category))
 
         self.bot.add_command(group)
-
 
 async def setup(bot):
     await bot.add_cog(ActionsCog(bot))
