@@ -5,31 +5,19 @@ import aiohttp
 
 FALLBACK_GIF = "https://media.tenor.com/gbf398P3xTEAAAAC/hug-anime.gif"
 
-# Mapping ALL actions to nekos.best API endpoints
-NEKOS_ACTIONS = {
-    "hug": "hug",
-    "punch": "punch",
-    "pat": "pat",
-    "slap": "slap",
-    "highfive": "highfive",
-    "yeet": "yeet",
-    "dodge": "dodge",
-    "aura": "shoot",
-    "flex": "bored",
-    "annoying": "poke",
-    "rizz": "smug",
-    "hello": "wave",
-    "goodmorning": "wave",
-    "goodnight": "sleep",
-    "feed": "feed",
-    "tickle": "tickle",
-    "stare": "stare",
-    "glare": "stare",
-    "bonk": "punch",
-    "kick": "kick",
-    "nuke": "shoot",
+# Static fallback used only if the live /endpoints fetch fails at startup
+# (e.g. nekos.best is briefly down when the bot boots). Once the live
+# fetch succeeds this is replaced with the real, full category list.
+STATIC_FALLBACK_CATEGORIES = {
+    "hug": "gif", "punch": "gif", "pat": "gif", "slap": "gif", "highfive": "gif",
+    "yeet": "gif", "dodge": "gif", "shoot": "gif", "bored": "gif", "poke": "gif",
+    "smug": "gif", "wave": "gif", "sleep": "gif", "feed": "gif", "tickle": "gif",
+    "stare": "gif", "bonk": "gif", "kick": "gif",
 }
 
+# Hand-written flavor text for the "signature" FlamingDeath actions.
+# Anything NOT in this dict (i.e. every other live nekos.best category)
+# gets an auto-generated generic line instead — see _default_text().
 FLAMINGDEATH_TEXTS = {
     "hug": lambda a, t: f"🤗 **[FlamingDeath Broadcast]** {a.mention} hugged aww {t.mention if t else 'everyone'}! Pretty friends!",
     "punch": lambda a, t: f"👊 **[FlamingDeath Broadcast]** FATAL BLOW! oww that hurt for sure 😵 {a.mention} punched {t.mention if t else 'the air'} into another dimension!",
@@ -38,39 +26,136 @@ FLAMINGDEATH_TEXTS = {
     "highfive": lambda a, t: f"🙌 **[FlamingDeath Broadcast]** EPIC COLLAB! {a.mention} high-fived {t.mention if t else 'themselves'} with high energy!",
     "yeet": lambda a, t: f"💨 **[FlamingDeath Broadcast]** YEET! {a.mention} threw {t.mention if t else 'everyone'} out of the server orbit!",
     "dodge": lambda a, t: f"⚡ **[FlamingDeath Broadcast]** MATRIX MOVES! {a.mention} effortlessly dodged {t.mention if t else 'the incoming attacks'}!",
-    "aura": lambda a, t: f"✨ **[FlamingDeath Broadcast]** OVERWHELMING POWER! {a.mention} flexed their aura on {t.mention if t else 'the entire server 😎'}!",
-    "flex": lambda a, t: f"💪 **[FlamingDeath Broadcast]** {a.mention} is flexing on {t.mention if t else 'all the mortals'}! Pure intimidation!",
-    "annoying": lambda a, t: f"🤪 **[FlamingDeath Broadcast]** {a.mention} is bored and annoying poor {t.mention if t else 'chat'}! The patience is breaking!",
-    "rizz": lambda a, t: f"😏 **[FlamingDeath Broadcast]** LIGHTSPEED RIZZ! {a.mention} left {t.mention if t else 'the server'} oww they like them soo much 💀!",
-    "hello": lambda a, t: f"👋 **[FlamingDeath Broadcast]** {a.mention} screamed HELLO at {t.mention if t else 'everyone'}! Welcome!",
-    "goodmorning": lambda a, t: f"☀️ **[FlamingDeath Broadcast]** Announcing sunrise! {a.mention} dumped a bucket of sunshine on {t.mention if t else 'the entire chat'}! WAKE UP!",
-    "goodnight": lambda a, t: f"🌙 **[FlamingDeath Broadcast]** Lights out! {a.mention} tucked {t.mention if t else 'everyone'} into bed with a high lullaby. Sleep tight!",
+    "shoot": lambda a, t: f"✨ **[FlamingDeath Broadcast]** OVERWHELMING POWER! {a.mention} flexed their aura on {t.mention if t else 'the entire server 😎'}!",
+    "bored": lambda a, t: f"💪 **[FlamingDeath Broadcast]** {a.mention} is flexing on {t.mention if t else 'all the mortals'}! Pure intimidation!",
+    "poke": lambda a, t: f"🤪 **[FlamingDeath Broadcast]** {a.mention} is bored and annoying poor {t.mention if t else 'chat'}! The patience is breaking!",
+    "smug": lambda a, t: f"😏 **[FlamingDeath Broadcast]** LIGHTSPEED RIZZ! {a.mention} left {t.mention if t else 'the server'} oww they like them soo much 💀!",
+    "wave": lambda a, t: f"👋 **[FlamingDeath Broadcast]** {a.mention} screamed HELLO at {t.mention if t else 'everyone'}! Welcome!",
+    "sleep": lambda a, t: f"🌙 **[FlamingDeath Broadcast]** Lights out! {a.mention} tucked {t.mention if t else 'everyone'} into bed with a high lullaby. Sleep tight!",
     "feed": lambda a, t: f"🥐 **[FlamingDeath Broadcast]** Emergency fueling! {a.mention} is force-feeding tasty anime snacks to {t.mention if t else 'the server'}!",
     "tickle": lambda a, t: f"🤭 **[FlamingDeath Broadcast]** Interrogation mode activated! {a.mention} is tickling {t.mention if t else 'random members'} until they surrender!",
     "stare": lambda a, t: f"👁️_👁️ **[FlamingDeath Broadcast]** Awkward silence... {a.mention} is staring through {t.mention if t else 'the chat' + chr(39) + 's'} soul. Explain yourselves!",
-    "glare": lambda a, t: f"😠 **[FlamingDeath Broadcast]** Danger alert! {a.mention} just hit {t.mention if t else 'the whole channel'} with a deadly GLARE! Run!",
     "bonk": lambda a, t: f"🔨 **[FlamingDeath Broadcast]** BONK! {a.mention} struck {t.mention if t else 'the general chat'} with the Legendary Hammer!",
     "kick": lambda a, t: f"🦶 **[FlamingDeath Broadcast]** BOOM! {a.mention} kicked {t.mention if t else 'an imaginary target'} straight through the server wall!",
-    "nuke": lambda a, t: f"💥 **[FlamingDeath Broadcast]** TACTICAL NUKE INBOUND! {a.mention} wiped out {t.mention if t else 'the battlefield'} with 1000-megaton energy!",
 }
+
+# Friendlier display names for categories whose raw API name reads oddly
+# in a generated sentence (e.g. "kabedon" -> still "kabedon", fine as-is;
+# this is only for the handful that need it).
+DISPLAY_NAME_OVERRIDES = {
+    "blowkiss": "blow a kiss to",
+    "handhold": "hold hands with",
+    "handshake": "shake hands with",
+    "facepalm": "facepalm at",
+}
+
+
+def _default_text(category: str):
+    verb = DISPLAY_NAME_OVERRIDES.get(category, category)
+    return lambda a, t: f"🔥 **[FlamingDeath Broadcast]** {a.mention} used **{verb}** on {t.mention if t else 'everyone'}!"
 
 
 class ActionsCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.session: aiohttp.ClientSession | None = None
+        # category_name -> "gif" or "png"
+        self.categories: dict[str, str] = {}
+
+    # Total top-level slash commands this cog will register. Your bot had
+    # 58 synced commands before this cog; replacing the old 21-command
+    # version with this budget nets ~77 total, leaving ~23 headroom under
+    # Discord's hard 100-global-command cap. Raise this later if you free
+    # up budget elsewhere, but check your !sync number again first.
+    SLASH_BUDGET = 40
+
+    # These get first priority for a slash slot (familiar names, custom
+    # flavor text). Remaining budget slots are filled from whatever other
+    # live categories come back from nekos.best, alphabetically.
+    PRIORITY_CATEGORIES = [
+        "hug", "punch", "pat", "slap", "highfive", "yeet", "dodge",
+        "shoot", "bored", "poke", "smug", "wave", "sleep", "feed",
+        "tickle", "stare", "bonk", "kick",
+    ]
 
     async def cog_load(self):
-        self.session = aiohttp.ClientSession()
+        self.session = aiohttp.ClientSession(
+            headers={"User-Agent": "FlamingDeathBot/1.0 (Discord action commands)"}
+        )
+        await self._load_categories()
+        self._register_prefix_group()
+        self._registered_slash_names: list[str] = []
+        self._register_slash_commands()
+
+    def _register_slash_commands(self):
+        chosen: list[str] = []
+        for cat in self.PRIORITY_CATEGORIES:
+            if cat in self.categories and cat not in chosen:
+                chosen.append(cat)
+                if len(chosen) >= self.SLASH_BUDGET:
+                    break
+
+        if len(chosen) < self.SLASH_BUDGET:
+            for cat in sorted(self.categories.keys()):
+                if cat not in chosen:
+                    chosen.append(cat)
+                    if len(chosen) >= self.SLASH_BUDGET:
+                        break
+
+        for category in chosen:
+            self._add_dynamic_slash(category)
+
+        print(f"🔥 Registered {len(chosen)} slash commands out of {len(self.categories)} live categories "
+              f"({len(self.categories) - len(chosen)} more available via !flamy / text-trigger only).", flush=True)
+
+    def _add_dynamic_slash(self, category: str):
+        async def _callback(interaction: discord.Interaction, target: discord.Member | None = None):
+            await interaction.response.defer()
+            await self._send_action(interaction.followup.send, interaction.user, category, target)
+
+        _callback.__name__ = category
+        verb = DISPLAY_NAME_OVERRIDES.get(category, category)
+        cmd = app_commands.Command(
+            name=category,
+            description=f"[FlamingDeath] {verb} someone!",
+            callback=_callback,
+        )
+        self.bot.tree.add_command(cmd)
+        self._registered_slash_names.append(category)
 
     async def cog_unload(self):
+        for name in getattr(self, "_registered_slash_names", []):
+            self.bot.tree.remove_command(name)
         if self.session and not self.session.closed:
             await self.session.close()
 
-    async def get_anime_gif(self, action: str) -> str:
-        category = NEKOS_ACTIONS.get(action.lower(), "stare")
-        url = f"https://nekos.best/api/v2/{category}"
+    async def _load_categories(self):
+        """Fetch the live, current category list straight from nekos.best."""
+        try:
+            async with self.session.get(
+                "https://nekos.best/api/v2/endpoints",
+                timeout=aiohttp.ClientTimeout(total=5),
+            ) as resp:
+                if resp.status == 200:
+                    data = await resp.json()
+                    # Only "gif" categories make sense as a targeted action;
+                    # png categories (neko, waifu, husbando, kitsune) are
+                    # standalone images, not something you "do" to someone.
+                    self.categories = {
+                        name: info.get("format", "gif")
+                        for name, info in data.items()
+                        if info.get("format") == "gif"
+                    }
+                    print(f"🔥 Loaded {len(self.categories)} live nekos.best gif categories.", flush=True)
+                    return
+        except Exception as e:
+            print(f"⚠️ Failed to fetch nekos.best /endpoints: {e}", flush=True)
 
+        print("⚠️ Falling back to static category list.", flush=True)
+        self.categories = STATIC_FALLBACK_CATEGORIES
+
+    async def get_anime_gif(self, category: str) -> str:
+        url = f"https://nekos.best/api/v2/{category}"
         try:
             async with self.session.get(url, timeout=aiohttp.ClientTimeout(total=5)) as resp:
                 if resp.status == 200:
@@ -80,31 +165,23 @@ class ActionsCog(commands.Cog):
                         return results[0].get("url", FALLBACK_GIF)
         except Exception as e:
             print(f"⚠️ Nekos API Error for '{category}': {e}", flush=True)
-
         return FALLBACK_GIF
 
-    async def execute_action(
-        self,
-        interaction: discord.Interaction,
-        action: str,
-        target: discord.Member | None = None,
-    ):
-        act_key = action.lower()
-        gif_url = await self.get_anime_gif(act_key)
+    def _text_for(self, category: str):
+        return FLAMINGDEATH_TEXTS.get(category, _default_text(category))
 
-        text_fn = FLAMINGDEATH_TEXTS.get(
-            act_key,
-            lambda a, t: f"🔥 **[FlamingDeath]** {a.mention} unleashed {act_key} on {t.mention if t else 'chat'}!",
-        )
-        text = text_fn(interaction.user, target)
+    async def _send_action(self, destination_send, author: discord.abc.User, category: str, target: discord.Member | None):
+        gif_url = await self.get_anime_gif(category)
+        text = self._text_for(category)(author, target)
 
         embed = discord.Embed(description=text, color=discord.Color.from_rgb(255, 69, 0))
         embed.set_image(url=gif_url)
-        embed.set_footer(text="FlamingDeath Action Protocol", icon_url=interaction.user.display_avatar.url)
+        embed.set_footer(text="FlamingDeath Action Protocol", icon_url=author.display_avatar.url)
+        await destination_send(embed=embed)
 
-        await interaction.followup.send(embed=embed)
-
-    # Optional text-trigger fallback: "flamy hug @user" works without a slash command
+    # ==========================================
+    # TEXT TRIGGER: "flamy <action> @user" — unlimited, covers every live category
+    # ==========================================
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message):
         if message.author.bot:
@@ -113,126 +190,34 @@ class ActionsCog(commands.Cog):
         parts = message.content.strip().split()
         if len(parts) >= 2 and parts[0].lower() == "flamy":
             action = parts[1].lower()
-            if action in NEKOS_ACTIONS:
+            if action in self.categories:
                 target = message.mentions[0] if message.mentions else None
-                gif_url = await self.get_anime_gif(action)
-                text_fn = FLAMINGDEATH_TEXTS.get(
-                    action,
-                    lambda a, t: f"🔥 **[FlamingDeath]** {a.mention} unleashed {action} on {t.mention if t else 'chat'}!",
-                )
-                text = text_fn(message.author, target)
-                embed = discord.Embed(description=text, color=discord.Color.from_rgb(255, 69, 0))
-                embed.set_image(url=gif_url)
-                embed.set_footer(text="FlamingDeath Action Protocol", icon_url=message.author.display_avatar.url)
-                await message.channel.send(embed=embed)
+                await self._send_action(message.channel.send, message.author, action, target)
 
     # ==========================================
-    # TOP-LEVEL SLASH COMMANDS — /hug, /punch, etc. directly, no group nesting
+    # PREFIX COMMANDS: "!flamy <action> @user" — unlimited, dynamically built
+    # from the live category list. Registered in cog_load, not via a
+    # fragile class-body loop.
     # ==========================================
-    @app_commands.command(name="hug", description="[FlamingDeath] 🤗 hug someone!")
-    async def hug(self, interaction: discord.Interaction, target: discord.Member | None = None):
-        await interaction.response.defer()
-        await self.execute_action(interaction, "hug", target)
+    def _register_prefix_group(self):
+        group = commands.Group(name="flamy", invoke_without_command=True, case_insensitive=True)
 
-    @app_commands.command(name="punch", description="[FlamingDeath] 👊 Fatal punch!")
-    async def punch(self, interaction: discord.Interaction, target: discord.Member | None = None):
-        await interaction.response.defer()
-        await self.execute_action(interaction, "punch", target)
+        async def flamy_root(ctx: commands.Context):
+            names = ", ".join(sorted(self.categories.keys()))
+            await ctx.send(f"🔥 **[FlamingDeath]** Available actions ({len(self.categories)}):\n`{names}`")
 
-    @app_commands.command(name="pat", description="[FlamingDeath] 😗 pat someone!")
-    async def pat(self, interaction: discord.Interaction, target: discord.Member | None = None):
-        await interaction.response.defer()
-        await self.execute_action(interaction, "pat", target)
+        group.callback = flamy_root
 
-    @app_commands.command(name="slap", description="[FlamingDeath] 💀 Slap the soul out of someone!")
-    async def slap(self, interaction: discord.Interaction, target: discord.Member | None = None):
-        await interaction.response.defer()
-        await self.execute_action(interaction, "slap", target)
+        def make_subcommand(category: str):
+            async def _cmd(ctx: commands.Context, target: discord.Member | None = None):
+                await self._send_action(ctx.send, ctx.author, category, target)
+            _cmd.__name__ = f"flamy_{category}"
+            return group.command(name=category)(_cmd)
 
-    @app_commands.command(name="highfive", description="[FlamingDeath] 🙌 Epic highfive!")
-    async def highfive(self, interaction: discord.Interaction, target: discord.Member | None = None):
-        await interaction.response.defer()
-        await self.execute_action(interaction, "highfive", target)
+        for category in self.categories:
+            make_subcommand(category)
 
-    @app_commands.command(name="yeet", description="[FlamingDeath] ⏏️ Yeet someone into orbit!")
-    async def yeet(self, interaction: discord.Interaction, target: discord.Member | None = None):
-        await interaction.response.defer()
-        await self.execute_action(interaction, "yeet", target)
-
-    @app_commands.command(name="dodge", description="[FlamingDeath] 💨 Matrix dodge!")
-    async def dodge(self, interaction: discord.Interaction, target: discord.Member | None = None):
-        await interaction.response.defer()
-        await self.execute_action(interaction, "dodge", target)
-
-    @app_commands.command(name="aura", description="[FlamingDeath] 😏 Flex your overwhelming aura!")
-    async def aura(self, interaction: discord.Interaction, target: discord.Member | None = None):
-        await interaction.response.defer()
-        await self.execute_action(interaction, "aura", target)
-
-    @app_commands.command(name="flex", description="[FlamingDeath] 🤟 flex!")
-    async def flex(self, interaction: discord.Interaction, target: discord.Member | None = None):
-        await interaction.response.defer()
-        await self.execute_action(interaction, "flex", target)
-
-    @app_commands.command(name="annoying", description="[FlamingDeath] 😝 Be relentlessly annoying!")
-    async def annoying(self, interaction: discord.Interaction, target: discord.Member | None = None):
-        await interaction.response.defer()
-        await self.execute_action(interaction, "annoying", target)
-
-    @app_commands.command(name="rizz", description="[FlamingDeath] 😘 Deploy lightspeed rizz!")
-    async def rizz(self, interaction: discord.Interaction, target: discord.Member | None = None):
-        await interaction.response.defer()
-        await self.execute_action(interaction, "rizz", target)
-
-    @app_commands.command(name="hello", description="[FlamingDeath] 👋 Scream HELLO at someone!")
-    async def hello(self, interaction: discord.Interaction, target: discord.Member | None = None):
-        await interaction.response.defer()
-        await self.execute_action(interaction, "hello", target)
-
-    @app_commands.command(name="goodmorning", description="[FlamingDeath] 🌄 Announce sunrise!")
-    async def goodmorning(self, interaction: discord.Interaction, target: discord.Member | None = None):
-        await interaction.response.defer()
-        await self.execute_action(interaction, "goodmorning", target)
-
-    @app_commands.command(name="goodnight", description="[FlamingDeath] 💤 Lights out!")
-    async def goodnight(self, interaction: discord.Interaction, target: discord.Member | None = None):
-        await interaction.response.defer()
-        await self.execute_action(interaction, "goodnight", target)
-
-    @app_commands.command(name="feed", description="[FlamingDeath] 🥪 Emergency fueling!")
-    async def feed(self, interaction: discord.Interaction, target: discord.Member | None = None):
-        await interaction.response.defer()
-        await self.execute_action(interaction, "feed", target)
-
-    @app_commands.command(name="tickle", description="[FlamingDeath] 🤣 Interrogation tickle!")
-    async def tickle(self, interaction: discord.Interaction, target: discord.Member | None = None):
-        await interaction.response.defer()
-        await self.execute_action(interaction, "tickle", target)
-
-    @app_commands.command(name="stare", description="[FlamingDeath] 🤨 Awkward stare!")
-    async def stare(self, interaction: discord.Interaction, target: discord.Member | None = None):
-        await interaction.response.defer()
-        await self.execute_action(interaction, "stare", target)
-
-    @app_commands.command(name="glare", description="[FlamingDeath] ☺️ Deadly glare!")
-    async def glare(self, interaction: discord.Interaction, target: discord.Member | None = None):
-        await interaction.response.defer()
-        await self.execute_action(interaction, "glare", target)
-
-    @app_commands.command(name="bonk", description="[FlamingDeath] 🔨 Legendary bonk!")
-    async def bonk(self, interaction: discord.Interaction, target: discord.Member | None = None):
-        await interaction.response.defer()
-        await self.execute_action(interaction, "bonk", target)
-
-    @app_commands.command(name="kick", description="[FlamingDeath] 🦶 Boom! Kick them!")
-    async def kick(self, interaction: discord.Interaction, target: discord.Member | None = None):
-        await interaction.response.defer()
-        await self.execute_action(interaction, "kick", target)
-
-    @app_commands.command(name="nuke", description="[FlamingDeath] ☢️ Tactical nuke!")
-    async def nuke(self, interaction: discord.Interaction, target: discord.Member | None = None):
-        await interaction.response.defer()
-        await self.execute_action(interaction, "nuke", target)
+        self.bot.add_command(group)
 
 
 async def setup(bot):
