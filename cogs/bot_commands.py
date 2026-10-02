@@ -37,14 +37,26 @@ def build_help_embed() -> discord.Embed:
     )
 
     embed.add_field(
-        name="🎭 Action & Anime Roleplay Commands",
+        name="🎭 Action Commands — 40 as Slash Commands!",
         value=(
-            "⚔️ **Combat Actions:** `kick`, `nuke`, `bonk`, `punch`, `slap`, `yeet`, `dodge`\n"
-            "✨ **Anime Tropes & Flex:** `aura`, `flex`, `annoying`, `rizz`, `stare`, `glare`\n"
-            "🥐 **Social & Daily Vibes:** `hug`, `pat`, `highfive`, `feed`, `tickle`, `hello`, `goodmorning`, `goodnight`!\n\n"
-            "🔥 **2 Ways to Use (Supports Caps & Small text):**\n"
-            "1️⃣ **Slash Command (recommended):** `/kick @user`, `/nuke @user`, etc. — directly, no `/flamy` needed\n"
+            "`hug` `punch` `pat` `slap` `highfive` `yeet` `shoot` `bored` `poke` `smug` "
+            "`wave` `sleep` `feed` `tickle` `stare` `bonk` `kick` `angry` `baka` `bite` "
+            "`bleh` `blowkiss` `blush` `carry` `clap` `confused` `cry` `cuddle` `dance` "
+            "`facepalm` `handhold` `handshake` `happy` `kabedon` `kiss` `lappillow` "
+            "`laugh` `lurk` `nod` `nom`\n\n"
+            "🔥 **2 Ways to Use:**\n"
+            "1️⃣ **Slash Command:** `/kick @user`, `/hug @user`, etc. — directly, no `/flamy` needed\n"
             "2️⃣ **Direct Text:** `flamy kick @user` or `FLAMY KICK @user`"
+        ),
+        inline=False
+    )
+
+    embed.add_field(
+        name="✨ More Actions — Text/Prefix Only (not slash commands yet)",
+        value=(
+            "`nope` `nya` `peck` `pout` `run` `salute` `shake` `shocked` `shrug` `sip` "
+            "`smile` `spin` `tableflip` `teehee` `think` `thumbsup` `wag` `wink` `yawn`\n\n"
+            "Use these with: `flamy <action> @user` or `!flamy <action> @user`"
         ),
         inline=False
     )
@@ -131,7 +143,7 @@ def build_help_embed() -> discord.Embed:
         inline=False
     )
 
-    embed.set_footer(text="Guarding Eternal Faction | Type !flamy help or flamy help anytime")
+    embed.set_footer(text="Guarding Eternal Faction | Type !help or flamy help anytime")
     return embed
 
 class FactionBotCommands(commands.Cog):
@@ -145,7 +157,8 @@ class FactionBotCommands(commands.Cog):
             return
 
         msg_clean = message.content.lower().strip()
-        if msg_clean in ["!flamy help", "flamy help", "/flamy help"]:
+        # Cleaned up triggers to prevent overlap with the ActionsCog command group
+        if msg_clean in ["!help", "flamy help", "help flamy", "?help"]:
             embed = build_help_embed()
             await message.channel.send(embed=embed)
 
@@ -364,3 +377,4 @@ class FactionBotCommands(commands.Cog):
 
 async def setup(bot):
     await bot.add_cog(FactionBotCommands(bot))
+        
