@@ -1,7 +1,9 @@
 import asyncio
+import ctypes.util
 import logging
 import os
 import re
+import shutil
 import tempfile
 import time
 from dataclasses import dataclass, field
@@ -18,7 +20,7 @@ MAX_CHARS = 350         # max spoken length (keeps TTS fast)
 QUEUE_LIMIT = 5
 
 # gTTS outputs 24 kHz audio. asetrate lowers the pitch, atempo restores the speed,
-# aecho adds a cave-like rumble. All done in a single ffmpeg pass (no pydub needed).
+# aecho adds a cave-like rumble. All done in a single ffmpeg pass.
 DRAGON_FX = "asetrate=18720,aresample=48000,atempo=1.282,aecho=0.8:0.85:70:0.25"
 
 SPOKEN_RULES = (
@@ -28,16 +30,33 @@ SPOKEN_RULES = (
 )
 
 
+# ---------------- system helpers (no Docker needed) ----------------
 def _ensure_opus():
     if discord.opus.is_loaded():
         return
-    for name in ("libopus.so.0", "libopus.so", "opus"):
+    candidates = [ctypes.util.find_library("opus"), "libopus.so.0", "libopus.so", "opus"]
+    for name in candidates:
+        if not name:
+            continue
         try:
             discord.opus.load_opus(name)
             return
         except Exception:
             continue
-    log.warning("Opus library not found. Install libopus0 in your Docker image.")
+    log.warning("Opus library not found on this system.")
+
+
+def _ffmpeg_exe() -> str:
+    if shutil.which("ffmpeg"):
+        return "ffmpeg"
+    try:
+        import imageio_ffmpeg
+        return imageio_ffmpeg.get_ffmpeg_exe()
+    except Exception:
+        return "ffmpeg"
+
+
+FFMPEG = _ffmpeg_exe()
 
 
 def clean_for_speech(text: str) -> str:
@@ -108,7 +127,10 @@ class Voice(commands.Cog):
                         log.error("Playback error: %s", err)
                     loop.call_soon_threadsafe(done.set)
 
-                vc.play(discord.FFmpegPCMAudio(path, options=f'-vn -af "{DRAGON_FX}"'), after=after)
+                vc.play(
+                    discord.FFmpegPCMAudio(path, executable=FFMPEG, options=f'-vn -af "{DRAGON_FX}"'),
+                    after=after,
+                )
                 await done.wait()
             except Exception:
                 log.exception("Voice worker failed")
@@ -164,6 +186,8 @@ class Voice(commands.Cog):
         perms = channel.permissions_for(interaction.guild.me)
         if not (perms.connect and perms.speak):
             return await interaction.followup.send("I need Connect and Speak permissions there.")
+        if not discord.opus.is_loaded():
+            return await interaction.followup.send("Voice engine (Opus) isn't available on this host yet.")
         try:
             vc = interaction.guild.voice_client
             if vc:
@@ -194,7 +218,8 @@ class Voice(commands.Cog):
         ok = await self.say(interaction.guild, text)
         await interaction.followup.send(
             "The dragon speaks. 🐉" if ok else "Nothing speakable, or too many words queued.",
-            ephemeral=True)
+            ephemeral=True,
+        )
 
     @app_commands.command(name="voiceask", description="Ask the dragon a question, answered by voice")
     @app_commands.guild_only()
@@ -207,7 +232,8 @@ class Voice(commands.Cog):
             # Separate history key so voice chats never mix with normal chat memory
             answer = await asyncio.wait_for(
                 self.bot.get_gemini_response(SPOKEN_RULES + question, f"voice-{interaction.user.id}"),
-                timeout=30)
+                timeout=30,
+            )
         except Exception:
             log.exception("Gemini failed")
             return await interaction.followup.send("My ancient mind stalled. Ask again!")
