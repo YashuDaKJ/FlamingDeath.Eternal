@@ -11,3 +11,5 @@ pymongo
 motor
 certifi
 gunicorn
+discord.py[voice]>=2.7
+gTTS
