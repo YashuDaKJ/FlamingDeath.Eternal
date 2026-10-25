@@ -1,6 +1,5 @@
-discord.py==2.4.0
+discord.py[voice]>=2.7
 google-generativeai==0.8.3
-python-dotenv==1.0.0
 flask
 beautifulsoup4
 requests
@@ -11,5 +10,5 @@ pymongo
 motor
 certifi
 gunicorn
-discord.py[voice]>=2.7
 gTTS
+imageio-ffmpeg
