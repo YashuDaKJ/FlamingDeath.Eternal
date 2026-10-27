@@ -1,4 +1,5 @@
 import os
+import re
 import sys
 import time
 import asyncio
@@ -43,6 +44,12 @@ DEFAULT_HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
 }
 
+MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024   # skip files bigger than 10 MB
+MAX_TRACKED_USERS = 300                   # cap chat memory so RAM can't grow forever
+
+# Whole-word name trigger: "flamy", "flamingdeath", "flaming death"
+NAME_PATTERN = re.compile(r"\b(flamingdeath|flaming\s+death|flamy)\b", re.IGNORECASE)
+
 # ==========================================
 # 1. RENDER PORT BINDING VIA FLASK
 # ==========================================
@@ -56,8 +63,7 @@ def health_check():
 def run_web_server():
     port = int(os.environ.get("PORT", 10000))
     import logging
-    web_log = logging.getLogger('werkzeug')
-    web_log.setLevel(logging.ERROR)
+    logging.getLogger('werkzeug').setLevel(logging.ERROR)
 
     log(f"🌐 Web Server binding on 0.0.0.0:{port}...")
     app.run(host='0.0.0.0', port=port, debug=False, use_reloader=False)
@@ -108,8 +114,9 @@ class FlamingDeathBot(commands.Bot):
         intents.members = True
 
         super().__init__(
-            command_prefix='!', 
-            intents=intents
+            command_prefix='!',
+            intents=intents,
+            help_command=None,   # help is handled by cogs/bot_commands.py
         )
 
         self.conversation_history = {}
@@ -128,7 +135,7 @@ class FlamingDeathBot(commands.Bot):
         if MONGO_URI:
             try:
                 self.db_client = motor.motor_asyncio.AsyncIOMotorClient(
-                    MONGO_URI, 
+                    MONGO_URI,
                     tlsCAFile=certifi.where()
                 )
                 self.db = self.db_client["eternal_faction_db"]
@@ -140,7 +147,7 @@ class FlamingDeathBot(commands.Bot):
         else:
             log("⚠️ WARNING: MONGO_URI missing!")
 
-        initial_cogs = ["cogs.bot_commands", "cogs.economy", "cogs.reaction", "cogs.voice" , "cogs.actions"]
+        initial_cogs = ["cogs.bot_commands", "cogs.economy", "cogs.reaction", "cogs.voice", "cogs.actions"]
         for cog in initial_cogs:
             try:
                 await self.load_extension(cog)
@@ -156,21 +163,30 @@ class FlamingDeathBot(commands.Bot):
             self.db_client.close()
         await super().close()
 
-    async def get_gemini_response(self, user_message: str, user_id: int, attachment_data=None) -> str:
+    # ---------- Gemini ----------
+    def _remember(self, user_id, role: str, text: str):
+        """Append to a user's chat memory, capped per user and in total."""
         if user_id not in self.conversation_history:
+            if len(self.conversation_history) >= MAX_TRACKED_USERS:
+                oldest = next(iter(self.conversation_history))
+                self.conversation_history.pop(oldest, None)
             self.conversation_history[user_id] = []
+        hist = self.conversation_history[user_id]
+        hist.append({"role": role, "parts": [text]})
+        if len(hist) > 15:
+            self.conversation_history[user_id] = hist[-15:]
 
+    async def get_gemini_response(self, user_message: str, user_id, attachment_data=None) -> str:
         sys_prompt = getattr(faction_data, 'SYSTEM_PROMPT', '')
         fact_prompt = getattr(faction_data, 'FACTION_PROMPT', '')
         combined_instruction = f"{sys_prompt}\n\nAdditional Faction Information:\n{fact_prompt}"
 
-        if attachment_data:
-            contents_payload = [user_message, attachment_data]
-        else:
-            self.conversation_history[user_id].append({"role": "user", "parts": [user_message]})
-            if len(self.conversation_history[user_id]) > 15:
-                self.conversation_history[user_id] = self.conversation_history[user_id][-15:]
+        track_history = attachment_data is None
+        if track_history:
+            self._remember(user_id, "user", user_message)
             contents_payload = self.conversation_history[user_id]
+        else:
+            contents_payload = [user_message, attachment_data]
 
         keys_to_try = API_KEYS.copy()
         random.shuffle(keys_to_try)
@@ -188,14 +204,11 @@ class FlamingDeathBot(commands.Bot):
                         model_name=model_name,
                         system_instruction=combined_instruction
                     )
-
-                    response = await asyncio.to_thread(
-                        model.generate_content, contents_payload
-                    )
+                    response = await asyncio.to_thread(model.generate_content, contents_payload)
                     assistant_message = response.text
 
-                    if not attachment_data:
-                        self.conversation_history[user_id].append({"role": "model", "parts": [assistant_message]})
+                    if track_history:
+                        self._remember(user_id, "model", assistant_message)
                     return assistant_message
 
                 except Exception as e:
@@ -208,99 +221,154 @@ class FlamingDeathBot(commands.Bot):
                     else:
                         break
 
+        # Every attempt failed: remove the unanswered user turn so history stays valid
+        if track_history and self.conversation_history.get(user_id):
+            self.conversation_history[user_id].pop()
+
         return "*ROAARRR!* 🎙️ *My fiery broadcast is choked by static! Try again shortly!*"
 
+    # ---------- Error handling ----------
+    async def on_command_error(self, ctx: commands.Context, error: commands.CommandError):
+        if isinstance(error, commands.CommandNotFound):
+            return   # "!firegif", "!help" etc. are handled elsewhere; don't spam logs
+        log(f"❌ Prefix command error: {error!r}")
+
     async def on_app_command_error(self, interaction: discord.Interaction, error: app_commands.AppCommandError):
-        if isinstance(error, app_commands.CommandInvokeError):
-            original = error.original
-            if hasattr(discord.errors, 'HTTPException') and isinstance(original, discord.errors.HTTPException) and original.status == 429:
-                log(f"⚠️ 429 Blocked on /{interaction.command.name}: Discord REST API rate limit.")
-                return
-        log(f"❌ Command Error in /{interaction.command.name}: {error}")
+        name = interaction.command.name if interaction.command else "unknown"
+
+        if isinstance(error, app_commands.CommandInvokeError) and \
+           isinstance(error.original, discord.HTTPException) and error.original.status == 429:
+            log(f"⚠️ 429 on /{name}: Discord REST API rate limit.")
+            return
+
+        if isinstance(error, app_commands.CommandOnCooldown):
+            msg = f"⏰ *Hold your flames! Try again in {error.retry_after:.0f}s.*"
+        elif isinstance(error, app_commands.MissingPermissions):
+            msg = "🔥 *Growls...* You lack the authority for that command."
+        elif isinstance(error, app_commands.NoPrivateMessage):
+            msg = "🔥 This command only works inside a server."
+        else:
+            log(f"❌ Command Error in /{name}: {error!r}")
+            msg = "🔥 *Grrr...* Something went wrong. Try again shortly!"
+
+        try:
+            if interaction.response.is_done():
+                await interaction.followup.send(msg, ephemeral=True)
+            else:
+                await interaction.response.send_message(msg, ephemeral=True)
+        except discord.HTTPException:
+            pass
 
     async def on_ready(self):
         log(f'🔥 {self.user.name} is online and connected!')
         await self.change_presence(activity=discord.Activity(type=discord.ActivityType.watching, name="over Eternal"))
 
+    # ---------- Message handling ----------
+    def _is_flamy_command(self, content_lower: str) -> bool:
+        """True for 'flamy hug @x', 'flamy help', 'help flamy' (handled by other cogs, not the AI)."""
+        parts = content_lower.split()
+        if content_lower in ("help flamy", "flamy help"):
+            return True
+        if len(parts) >= 2 and parts[0] == "flamy":
+            actions = self.get_cog("ActionsCog")
+            categories = getattr(actions, "categories", {}) or {}
+            return parts[1] in categories
+        return False
+
     async def on_message(self, message):
         if message.author.bot or message.mention_everyone:
+            return
+
+        content_lower = message.content.lower().strip()
+
+        # Fun GIF trigger (checked before the prefix so "!firegif" works too)
+        if content_lower in ("let's burn", "!firegif"):
+            await message.channel.send("https://tenor.com/view/dragon-fire-breathe-fire-fantasy-creature-gif-17482329")
             return
 
         if message.content.startswith(self.command_prefix):
             await self.process_commands(message)
             return
 
-        content_lower = message.content.lower()
+        # "flamy hug @user", "flamy help" are handled by the actions / help cogs
+        if self._is_flamy_command(content_lower):
+            return
 
         is_gif = "tenor.com" in content_lower or "giphy.com" in content_lower
         if not is_gif and message.attachments:
             is_gif = any(att.filename.lower().endswith('.gif') for att in message.attachments)
 
-        if content_lower == "let's burn" or content_lower == "!firegif":
-            dragon_gif_url = "https://tenor.com/view/dragon-fire-breathe-fire-fantasy-creature-gif-17482329"
-            await message.channel.send(dragon_gif_url)
-            return  
-
         is_pinged_or_replied = self.user.mentioned_in(message)
         if not is_pinged_or_replied and message.reference:
+            replied_to = message.reference.resolved or message.reference.cached_message
+            if replied_to is None and message.reference.message_id:
+                try:
+                    replied_to = await message.channel.fetch_message(message.reference.message_id)
+                except Exception:
+                    replied_to = None
+            if replied_to is not None and getattr(replied_to, "author", None) == self.user:
+                is_pinged_or_replied = True
+
+        name_called = bool(NAME_PATTERN.search(message.content))
+        should_reply = (message.channel.id == SPECIAL_CHANNEL_ID) or is_pinged_or_replied or name_called
+        if not should_reply:
+            return
+
+        current_time = time.time()
+        user_id = message.author.id
+        last = self.chat_cooldowns.get(user_id)
+        if last is not None and current_time - last < 5:
+            remaining = int(5 - (current_time - last)) + 1
             try:
-                replied_to = await message.channel.fetch_message(message.reference.message_id)
-                if replied_to.author == self.user:
-                    is_pinged_or_replied = True
+                await message.reply(f"⏰ *Hold your flames! Wait {remaining}s before broadcasting again.*",
+                                    delete_after=3, mention_author=False)
             except Exception:
                 pass
+            return
+        self.chat_cooldowns[user_id] = current_time
 
-        name_called = "flamingdeath" in content_lower or "flaming death" in content_lower
-        if (message.channel.id == SPECIAL_CHANNEL_ID) or is_pinged_or_replied or name_called:
-            current_time = time.time()
-            user_id = message.author.id
-            if user_id in self.chat_cooldowns:
-                elapsed = current_time - self.chat_cooldowns[user_id]
-                if elapsed < 5:
-                    remaining = int(5 - elapsed)
-                    try:
-                        await message.reply(f"⏰ *Hold your flames! Wait {remaining}s before broadcasting again.*", delete_after=3)
-                    except Exception:
-                        pass
+        try:
+            async with message.channel.typing():
+                clean_message = message.content.replace(f'<@{self.user.id}>', '').replace(f'<@!{self.user.id}>', '').strip()
+
+                if not clean_message and is_gif:
+                    clean_message = "Look at this GIF I sent you!"
+                elif not clean_message and message.attachments:
+                    clean_message = "Look at this file!"
+
+                if not clean_message:
                     return
 
-            self.chat_cooldowns[user_id] = current_time
+                attachment_data = None
+                if message.attachments and self.session:
+                    try:
+                        att = message.attachments[0]
+                        if att.size > MAX_ATTACHMENT_BYTES:
+                            await message.reply("📦 That file is too big for my claws (max 10 MB).",
+                                                mention_author=False)
+                            return
+                        if att.content_type:
+                            async with self.session.get(att.url, headers=DEFAULT_HEADERS) as resp:
+                                if resp.status == 200:
+                                    attachment_data = {
+                                        'mime_type': att.content_type.split(';')[0],
+                                        'data': await resp.read(),
+                                    }
+                    except Exception as e:
+                        log(f"Attachment download failed: {e}")
 
-            try:
-                async with message.channel.typing():
-                    clean_message = message.content.replace(f'<@{self.user.id}>', '').replace(f'<@!{self.user.id}>', '').strip()
+                response = await self.get_gemini_response(clean_message, message.author.id, attachment_data)
 
-                    if not clean_message and is_gif: 
-                        clean_message = "Look at this GIF I sent you!"
-                    elif not clean_message and message.attachments: 
-                        clean_message = "Look at this file!"
+                for i in range(0, len(response), 1900):
+                    await message.reply(response[i:i + 1900], mention_author=False)
 
-                    if clean_message:
-                        attachment_data = None
-                        if message.attachments and self.session:
-                            try:
-                                file_attachment = message.attachments[0]
-                                if file_attachment.content_type:
-                                    async with self.session.get(file_attachment.url, headers=DEFAULT_HEADERS) as resp:
-                                        if resp.status == 200:
-                                            file_bytes = await resp.read()
-                                            attachment_data = {
-                                                'mime_type': file_attachment.content_type, 
-                                                'data': file_bytes
-                                            }
-                            except Exception as e:
-                                log(f"Attachment download failed: {e}")
-
-                        response = await self.get_gemini_response(clean_message, message.author.id, attachment_data)
-                        if len(response) > 2000:
-                            chunks = [response[i:i+1900] for i in range(0, len(response), 1900)]
-                            for chunk in chunks:
-                                await message.reply(chunk, mention_author=False)
-                        else:
-                            await message.reply(response, mention_author=False)
-            except discord.errors.HTTPException as typing_err:
-                if typing_err.status == 429:
-                    log("⚠️ Typing status skipped due to Discord rate limit.")
+        except discord.errors.HTTPException as http_err:
+            if http_err.status == 429:
+                log("⚠️ Rate limited by Discord (429) while replying.")
+            else:
+                log(f"⚠️ HTTP error while replying: {http_err}")
+        except Exception as err:
+            log(f"❌ on_message error: {err!r}")
 
 # ==========================================
 # 4. INFINITE GATEWAY RETRY LOOP
@@ -334,10 +402,10 @@ async def start_gateway():
                 return await ctx.send("✨ Server cache cleared! Run `!sync` now to re-register.")
 
             if spec == "global":
-                await ctx.send("🌐 Syncing clean commands globally...")
+                await ctx.send("🌐 Syncing commands globally...")
                 try:
                     synced = await bot.tree.sync()
-                    await ctx.send(f"✅ Synced **{len(synced)}** clean commands globally!")
+                    await ctx.send(f"✅ Synced **{len(synced)}** commands globally!")
                 except Exception as e:
                     await ctx.send(f"❌ Global synchronization failed: {e}")
                 return
@@ -355,9 +423,12 @@ async def start_gateway():
                 await bot.start(DISCORD_TOKEN)
             log("✅ Bot shut down cleanly (logout requested). Exiting loop.")
             break
+        except discord.LoginFailure:
+            log("❌ Invalid Discord token. Fix DISCORD_TOKEN and redeploy.")
+            break
         except discord.errors.HTTPException as e:
             if e.status == 429:
-                log(f"⚠️ DISCORD 429 RATE LIMIT ENCOUNTERED (Attempt {attempt})! Retrying in {retry_delay}s...")
+                log(f"⚠️ DISCORD 429 RATE LIMIT (Attempt {attempt})! Retrying in {retry_delay}s...")
                 await asyncio.sleep(retry_delay)
                 retry_delay = min(retry_delay * 2, 900)
             else:
