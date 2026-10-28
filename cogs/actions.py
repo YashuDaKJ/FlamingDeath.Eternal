@@ -1,3 +1,5 @@
+import random
+
 import discord
 from discord.ext import commands
 from discord import app_commands
@@ -74,25 +76,96 @@ COMMAND_DESCRIPTIONS = {
     "thumbsup": "Give a big thumbs up for approval!",
 }
 
-# Hand-written flavor text for the "signature" FlamingDeath actions.
+def _fmt_target(target: discord.abc.User | None, fallback: str = "everyone") -> str:
+    return target.mention if target else fallback
+
+# Randomized funny text variations for each action.
 FLAMINGDEATH_TEXTS = {
-    "hug": lambda a, t: f"🤗 **[FlamingDeath Broadcast]** {a.mention} hugged aww {t.mention if t else 'everyone'}! Pretty friends!",
-    "punch": lambda a, t: f"👊 **[FlamingDeath Broadcast]** FATAL BLOW! oww that hurt for sure 😵 {a.mention} punched {t.mention if t else 'the air'} into another dimension!",
-    "pat": lambda a, t: f"🖐️ **[FlamingDeath Broadcast]** {a.mention} is patting {t.mention if t else 'someone' + chr(39) + 's'} head! Cute!",
-    "slap": lambda a, t: f"👋 **[FlamingDeath Broadcast]** OOF! {a.mention} slapped the soul out of {t.mention if t else 'chat'}!",
-    "highfive": lambda a, t: f"🙌 **[FlamingDeath Broadcast]** EPIC COLLAB! {a.mention} high-fived {t.mention if t else 'themselves'} with high energy!",
-    "yeet": lambda a, t: f"💨 **[FlamingDeath Broadcast]** YEET! {a.mention} threw {t.mention if t else 'everyone'} out of the server orbit!",
-    "shoot": lambda a, t: f"✨ **[FlamingDeath Broadcast]** OVERWHELMING POWER! {a.mention} flexed their aura on {t.mention if t else 'the entire server 😎'}!",
-    "bored": lambda a, t: f"💪 **[FlamingDeath Broadcast]** {a.mention} is flexing on {t.mention if t else 'all the mortals'}! Pure intimidation!",
-    "poke": lambda a, t: f"🤪 **[FlamingDeath Broadcast]** {a.mention} is bored and annoying poor {t.mention if t else 'chat'}! The patience is breaking!",
-    "smug": lambda a, t: f"😏 **[FlamingDeath Broadcast]** LIGHTSPEED RIZZ! {a.mention} left {t.mention if t else 'the server'} oww they like them soo much 💀!",
-    "wave": lambda a, t: f"👋 **[FlamingDeath Broadcast]** {a.mention} screamed HELLO at {t.mention if t else 'everyone'}! Welcome!",
-    "sleep": lambda a, t: f"🌙 **[FlamingDeath Broadcast]** Lights out! {a.mention} tucked {t.mention if t else 'everyone'} into bed with a high lullaby. Sleep tight!",
-    "feed": lambda a, t: f"🥐 **[FlamingDeath Broadcast]** Emergency fueling! {a.mention} is force-feeding tasty snacks to {t.mention if t else 'the server'}!",
-    "tickle": lambda a, t: f"🤭 **[FlamingDeath Broadcast]** Interrogation mode activated! {a.mention} is tickling {t.mention if t else 'random members'} until they surrender!",
-    "stare": lambda a, t: f"👁️_👁️ **[FlamingDeath Broadcast]** Awkward silence... {a.mention} is staring through {t.mention if t else 'the chat' + chr(39) + 's'} soul. Explain yourselves!",
-    "bonk": lambda a, t: f"🔨 **[FlamingDeath Broadcast]** BONK! {a.mention} struck {t.mention if t else 'the general chat'} with the Legendary Hammer!",
-    "kick": lambda a, t: f"🦶 **[FlamingDeath Broadcast]** BOOM! {a.mention} kicked {t.mention if t else 'an imaginary target'} straight through the server wall!",
+    "hug": [
+        "{a} jumped in with a warm, dramatic hug for {t} and instantly made the room feel way too cozy.",
+        "{a} wrapped {t} in a full-body hug and somehow turned chaos into a wholesome moment.",
+        "{a} launched a hug ambush on {t} and called it a successful public service.",
+    ],
+    "punch": [
+        "{a} landed a brutal punch on {t} and somehow made it look stylish.",
+        "{a} sent {t} flying back with a clean knockout hit and zero mercy.",
+        "{a} absolutely walloped {t} like the room was a fighting game and they were the boss battle.",
+    ],
+    "pat": [
+        "{a} gently patted {t}'s head like a calm boss with zero fear and maximum affection.",
+        "{a} gave {t} a quick head pat and somehow made it feel like a power move.",
+        "{a} tapped {t} on the head and instantly became the most emotionally stable person in the chat.",
+    ],
+    "slap": [
+        "{a} slapped the soul out of {t} and left the room stunned for a full second.",
+        "{a} gave {t} a cinematic slap and somehow made it look like a warning shot.",
+        "{a} clapped {t} with a dramatic slap and perfectly timed chaos.",
+    ],
+    "highfive": [
+        "{a} high-fived {t} like a total legend and instantly boosted the mood of the whole server.",
+        "{a} pulled off a hype-level high-five with {t} and made the room feel like a montage.",
+        "{a} and {t} locked hands in a high-five so clean it deserved its own soundtrack.",
+    ],
+    "yeet": [
+        "{a} yeeted {t} clean out of the server orbit and called it a team-building exercise.",
+        "{a} launched {t} across the room like they were trying to break the stratosphere.",
+        "{a} threw {t} so hard they may need a new timezone after this.",
+    ],
+    "shoot": [
+        "{a} fired a glowing beam at {t} and somehow made the whole channel feel like a movie scene.",
+        "{a} blasted {t} with pure energy and walked away like it was nothing.",
+        "{a} unleashed a ridiculous laser shot on {t} and called it a clean finish.",
+    ],
+    "bored": [
+        "{a} flexed at {t} with maximum boredom energy and somehow made it intimidating.",
+        "{a} went full sleepy flex and still managed to make {t} feel personally attacked.",
+        "{a} looked at {t} like they were the problem and the problem was very much not okay.",
+    ],
+    "poke": [
+        "{a} kept poking {t} until even the silence started judging them.",
+        "{a} launched a full-on poke assault on {t} and proudly called it a strategy.",
+        "{a} poked {t} with absolute confidence and zero concern for boundaries.",
+    ],
+    "smug": [
+        "{a} gave {t} the smuggest look in the room and somehow made it a victory speech.",
+        "{a} locked eyes with {t} and smirked like they already won the argument.",
+        "{a} leaned in with pure smug energy and made {t} feel personally judged.",
+    ],
+    "wave": [
+        "{a} waved at {t} so enthusiastically it felt like the whole server got a greeting.",
+        "{a} gave {t} a warm hello wave and somehow made it a full event.",
+        "{a} waved at {t} like they were launching a friendly apocalypse.",
+    ],
+    "sleep": [
+        "{a} tucked {t} into a dramatic bedtime nap and called it mission accomplished.",
+        "{a} put {t} to sleep like a bedtime legend with zero shame and full theatrics.",
+        "{a} started a sleep routine with {t} and somehow turned bedtime into a villain monologue.",
+    ],
+    "feed": [
+        "{a} force-fed a snack to {t} like a personal chef with zero regard for personal space.",
+        "{a} shoved food at {t} and declared it the most important event of the day.",
+        "{a} fed {t} with dramatic flair and zero concern for their dietary plan.",
+    ],
+    "tickle": [
+        "{a} started a ruthless tickle attack on {t} and the room immediately became chaos.",
+        "{a} tickled {t} until they were laughing so hard the whole chat felt it.",
+        "{a} launched a surprise tickle ambush on {t} and called it public service.",
+    ],
+    "stare": [
+        "{a} locked eyes with {t} and somehow made the silence feel more dramatic than the action.",
+        "{a} stared straight through {t} like they were reading the entire future in one look.",
+        "{a} and {t} got stuck in an awkward stare-off that somehow became the main event.",
+    ],
+    "bonk": [
+        "{a} bonked {t} with the legendary hammer and made the room gasp instantly.",
+        "{a} unleashed the ban hammer on {t} and somehow made it feel heroic.",
+        "{a} bonked {t} so dramatically even the hammer looked proud.",
+    ],
+    "kick": [
+        "{a} kicked {t} straight through the server wall and called it a clean finish.",
+        "{a} booted {t} with full savage energy and instantly made the room cheer.",
+        "{a} launched a brutal kick at {t} and somehow made the impact look elegant.",
+    ],
 }
 
 DISPLAY_NAME_OVERRIDES = {
@@ -104,7 +177,65 @@ DISPLAY_NAME_OVERRIDES = {
 
 def _default_text(category: str):
     verb = DISPLAY_NAME_OVERRIDES.get(category, category)
-    return lambda a, t: f"🔥 **[FlamingDeath Broadcast]** {a.mention} used **{verb}** on {t.mention if t else 'everyone'}!"
+    return lambda a, t: f"🔥 **[FlamingDeath Chaos]** {a.mention} used **{verb}** on {_fmt_target(t, 'everyone')}!"
+
+class ActionRetaliateView(discord.ui.View):
+    def __init__(self, cog: "ActionsCog", category: str, original_author: discord.abc.User, target: discord.Member | None):
+        super().__init__(timeout=180)
+        self.cog = cog
+        self.category = category
+        self.original_author = original_author
+        self.target = target
+
+        label = self._build_button_label(category)
+        self.action_button = discord.ui.Button(
+            label=label,
+            style=discord.ButtonStyle.secondary,
+        )
+        self.action_button.callback = self._on_click
+        self.add_item(self.action_button)
+
+    @staticmethod
+    def _build_button_label(category: str) -> str:
+        replacements = {
+            "hug": "Hug",
+            "punch": "Punch",
+            "pat": "Pat",
+            "slap": "Slap",
+            "highfive": "High-Five",
+            "yeet": "Yeet",
+            "shoot": "Shoot",
+            "bored": "Bored",
+            "poke": "Poke",
+            "smug": "Smug",
+            "wave": "Wave",
+            "sleep": "Sleep",
+            "feed": "Feed",
+            "tickle": "Tickle",
+            "stare": "Stare",
+            "bonk": "Bonk",
+            "kick": "Kick",
+        }
+        name = replacements.get(category, category.replace("_", " ").replace("-", " ").title())
+        return f"🔄 {name} Back!"
+
+    def disable_all_items(self):
+        for item in self.children:
+            item.disabled = True
+
+    async def _on_click(self, interaction: discord.Interaction):
+        if self.target is not None and interaction.user != self.target:
+            await interaction.response.send_message("⚠️ Only the target can retaliate!", ephemeral=True)
+            return
+
+        self.disable_all_items()
+        await interaction.response.defer()
+        try:
+            await interaction.message.edit(view=self)
+        except discord.NotFound:
+            pass
+
+        await self.cog._send_action(interaction.channel.send, interaction.user, self.category, self.original_author)
 
 class ActionsCog(commands.Cog):
     def __init__(self, bot):
@@ -168,13 +299,11 @@ class ActionsCog(commands.Cog):
         self._registered_slash_names.append(category)
 
     async def cog_unload(self):
-        # Remove dynamically added slash commands
         for name in getattr(self, "_registered_slash_names", []):
             self.bot.tree.remove_command(name)
-        
-        # Remove dynamically added prefix group
+
         self.bot.remove_command("flamy")
-        
+
         if self.session and not self.session.closed:
             await self.session.close()
 
@@ -213,7 +342,13 @@ class ActionsCog(commands.Cog):
         return FALLBACK_GIF
 
     def _text_for(self, category: str):
-        return FLAMINGDEATH_TEXTS.get(category, _default_text(category))
+        variants = FLAMINGDEATH_TEXTS.get(category)
+        if isinstance(variants, list) and variants:
+            return lambda a, t: random.choice(variants).format(
+                a=a.mention,
+                t=_fmt_target(t, "everyone"),
+            )
+        return _default_text(category)
 
     async def _send_action(self, destination_send, author: discord.abc.User, category: str, target: discord.Member | None):
         gif_url = await self.get_anime_gif(category)
@@ -221,8 +356,10 @@ class ActionsCog(commands.Cog):
 
         embed = discord.Embed(description=text, color=discord.Color.from_rgb(255, 69, 0))
         embed.set_image(url=gif_url)
-        embed.set_footer(text="FlamingDeath Action Protocol", icon_url=author.display_avatar.url)
-        await destination_send(embed=embed)
+        embed.set_footer(text="FlamingDeath Action Arena", icon_url=author.display_avatar.url)
+
+        view = ActionRetaliateView(self, category, author, target)
+        await destination_send(embed=embed, view=view)
 
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message):
@@ -237,7 +374,6 @@ class ActionsCog(commands.Cog):
                 await self._send_action(message.channel.send, message.author, action, target)
 
     def _register_prefix_group(self):
-        # The main issue was here: 'flamy_root' needed to be passed directly as the first argument 'func'
         async def flamy_root(ctx: commands.Context):
             names = ", ".join(sorted(self.categories.keys()))
             await ctx.send(f"🔥 **[FlamingDeath]** Available actions ({len(self.categories)}):\n`{names}`")
@@ -248,7 +384,6 @@ class ActionsCog(commands.Cog):
             async def _cmd(ctx: commands.Context, target: discord.Member | None = None):
                 await self._send_action(ctx.send, ctx.author, cat_name, target)
             _cmd.__name__ = f"flamy_{cat_name}"
-            # Same here: '_cmd' is passed as the first argument
             return commands.Command(_cmd, name=cat_name)
 
         for category in self.categories:
