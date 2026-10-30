@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://cdn.discordapp.com/attachments/1478401568159170752/1536399680215187496/IMG_20260712_150837-removebg-preview.png?ex=6a7bebf4&is=6a7a9a74&hm=9f7f30e6e68b009071ebba5faaeb9881cd2c6bda3045ad3c17135f98a22845c2&" alt="FlamingDeath Logo" width="200"/>
+  <img src="https://cdn.discordapp.com/attachments/1492172037500698758/1565733127073046579/1793283836740-removebg-preview.png?ex=6ae5fa1b&is=6ae4a89b&hm=6a3d3747c63baa9322499b9dd2088b9ab5e7a646187fc5d2ed01b5ec69d1fbea&" alt="FlamingDeath Logo" width="200"/>
 </p>
   
 # 🔥 FlamingDeath — Faction Gamification & AI Intelligence Core
